@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhes do Diário</title>
+<style>
+  :root{ --prim:#3A6385; --muted:#66758a; --line:#e6e6e6; --bg:#f4f6f9; }
+  *{ box-sizing:border-box; } body{ font-family: Arial, sans-serif; background:#f4f6f9; color:#233; margin:0; }
+  header{ background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.06); padding:16px; position:sticky; top:0; z-index:10; }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 4px; color:#222; } .sub{ color:var(--muted); font-size:13px; }
+  .chips{ display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; } .chip{ background:#eef2f6; color:#233; border-radius:999px; padding:6px 10px; font-size:12px; }
+  .actions{ display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+  .btn{ padding:10px 16px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:14px; text-decoration:none; display:inline-block; }
+  .btn.ghost{ background:#eef2f6; color:#233; }
+  main{ max-width:1100px; margin:16px auto; padding:0 16px 24px; }
+  .grid{ display:grid; gap:16px; } @media(min-width:900px){ .grid{ grid-template-columns: 1fr 1fr; } }
+  .card{ background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08); padding:16px; }
+  .card h2{ margin:0 0 12px; font-size:16px; color:#333; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  table{ width:100%; border-collapse:collapse; } th, td{ border:1px solid var(--line); padding:8px; font-size:14px; } th{ background:#f5f9ff; text-align:left; }
+  .muted{ color:#66758a; font-size:13px; }
+  .kpis{ display:flex; gap:12px; flex-wrap:wrap; } .kpi{ background:#fff; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,.07); padding:14px 16px; min-width:160px; }
+  .kpi .label{ color:#66758a; font-size:12px; } .kpi .value{ font-size:22px; font-weight:700; color:#3A6385; }
+  .codes{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; } .code{ background:#e8eef9; color:#234; border-radius:6px; padding:4px 8px; font-size:12px; }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  .ctl{ display:flex; align-items:center; gap:8px; font-size:12px; color:#556; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1 id="titulo">Diário #</h1>
+      <div class="sub" id="subinfo">—</div>
+      <div class="chips">
+        <span class="chip"><strong>Obra:</strong> <span id="obra">—</span></span>
+        <span class="chip"><strong>Responsável:</strong> <span id="resp">—</span></span>
+        <span class="chip"><strong>Data:</strong> <span id="data">—</span></span>
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="viewer.html">Voltar</a>
+        <a class="btn ghost" id="btnEdit" href="#">Editar</a>
+        <button class="btn" id="btnPrint">Imprimir / PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Resumo -->
+    <div class="wrap card">
+      <h2>Resumo do Dia</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Presentes</div><div class="value" id="kpiPres">0</div></div>
+        <div class="kpi"><div class="label">Ausentes</div><div class="value" id="kpiAus">0</div></div>
+        <div class="kpi"><div class="label">Férias</div><div class="value" id="kpiFer">0</div></div>
+        <div class="kpi"><div class="label">Total</div><div class="value" id="kpiTot">0</div></div>
+      </div>
+      <div class="codes" id="codes"></div>
+    </div>
+
+    <div class="wrap grid" style="margin-top:16px;">
+      <!-- Equipe -->
+      <div class="card">
+        <h2>
+          Equipe por Função
+          <span class="ctl">
+            <input type="checkbox" id="hidZero">
+            <label for="hidZero">Ocultar funções zeradas</label>
+          </span>
+        </h2>
+        <table id="tabFun">
+          <thead><tr><th>Função</th><th>Presente</th><th>Ausente</th><th>Férias</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Observações -->
+      <div class="card">
+        <h2>Observações / Serviços</h2>
+        <div id="obs" class="muted">—</div>
+      </div>
+    </div>
+
+    <div class="wrap grid" style="margin-top:16px;">
+      <!-- Ausentes Identificados -->
+      <div class="card">
+        <h2>Ausentes Identificados</h2>
+        <table id="tabAus">
+          <thead><tr><th style="width:20%">Chapa</th><th>Nome</th><th style="width:35%">Função</th></tr></thead>
+          <tbody><tr><td colspan="3" class="muted">Nenhum ausente informado.</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Intercorrências -->
+      <div class="card">
+        <h2>Intercorrências</h2>
+        <div id="interList" class="muted">Nenhuma intercorrência registrada.</div>
+      </div>
+    </div>
+
+    <div class="wrap" style="text-align:center; color:#99a3b3; font-size:12px; margin-top:24px;">
+      Gerado por Diário de Obra • <span class="mono" id="stamp">—</span>
+    </div>
+  </main>
+
+<script>
+const API = location.origin;
+function getId(){ return new URL(location.href).searchParams.get('id'); }
+function text(x){ return (x==null||String(x).trim()==='')?'—':x; }
+function sum(arr,key){ return arr.reduce((s,o)=>s+(parseInt(o[key]||0,10)||0),0); }
+
+async function ensureAuth() {
+  const r = await fetch(`${API}/api/me`, { credentials: 'include' });
+  if (r.status === 401) { location.href = '/login.html'; return false; }
+  return true;
+}
+
+function renderFuncoes(funcoes, hideZero=false){
+  const tb = document.querySelector('#tabFun tbody'); tb.innerHTML='';
+  (funcoes||[]).forEach(f=>{
+    const p = parseInt(f.presente||0,10)||0;
+    const a = parseInt(f.ausente||0,10)||0;
+    const fer = parseInt(f.ferias||0,10)||0;
+    const tot = p+a+fer;
+    if(hideZero && tot===0) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${f.funcao}</td><td>${p}</td><td>${a}</td><td>${fer}</td><td><strong>${tot}</strong></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function load(){
+  const ok = await ensureAuth(); if(!ok) return;
+  const id = getId(); if(!id){ alert('ID ausente.'); return; }
+  const r = await fetch(`${API}/api/diarios/${id}`, { credentials:'include' });
+  const d = await r.json(); if(!r.ok){ alert(d.error||'Erro ao carregar'); return; }
+
+  document.getElementById('titulo').textContent = `Diário #${d.id}`;
+  document.getElementById('subinfo').textContent = `Criado em ${d.created_at||''}`;
+  document.getElementById('obra').textContent = text(d.obra);
+  document.getElementById('resp').textContent = text(d.responsavel);
+  document.getElementById('data').textContent = text(d.data);
+  document.getElementById('obs').textContent = text(d.observacoes);
+  document.getElementById('btnEdit').href = `edit.html?id=${d.id}`;
+
+  const pres = sum(d.funcoes,'presente');
+  const aus  = sum(d.funcoes,'ausente');
+  const fer  = sum(d.funcoes,'ferias');
+  document.getElementById('kpiPres').textContent = pres;
+  document.getElementById('kpiAus').textContent  = aus;
+  document.getElementById('kpiFer').textContent  = fer;
+  document.getElementById('kpiTot').textContent  = pres + aus + fer;
+  document.getElementById('stamp').textContent   = new Date().toLocaleString();
+
+  // Equipe por função
+  const chk = document.getElementById('hidZero');
+  const rerender = ()=> renderFuncoes(d.funcoes, chk.checked);
+  chk.addEventListener('change', rerender);
+  rerender();
+
+  // Ausentes
+  const tbA = document.querySelector('#tabAus tbody'); tbA.innerHTML='';
+  if((d.ausentes||[]).length){
+    d.ausentes.forEach(a=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${text(a.chapa)}</td><td>${text(a.nome)}</td><td>${text(a.funcao)}</td>`;
+      tbA.appendChild(tr);
+    });
+  } else {
+    tbA.innerHTML=`<tr><td colspan="3" class="muted">Nenhum ausente informado.</td></tr>`;
+  }
+
+  // Intercorrências
+  const box = document.getElementById('interList');
+  if((d.intercorrencias||[]).length){
+    const ul=document.createElement('ul'); ul.style.margin='0'; ul.style.paddingLeft='18px';
+    d.intercorrencias.forEach(i=>{
+      const code=(i.codigo!=null && String(i.codigo).trim()!=='')?`#${i.codigo} — `:'';
+      const li=document.createElement('li'); li.textContent=code+(i.descricao||'—'); ul.appendChild(li);
+    });
+    box.innerHTML=''; box.appendChild(ul);
+  } else {
+    box.textContent='Nenhuma intercorrência registrada.';
+  }
+}
+document.getElementById('btnPrint').addEventListener('click',()=>window.print());
+window.addEventListener('DOMContentLoaded', load);
+</script>
+</body>
+</html>

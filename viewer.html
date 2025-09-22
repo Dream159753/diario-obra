@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Curadoria • Diário de Obra</title>
+<style>
+  :root{ --prim:#3A6385; --muted:#6b7a8c; --line:#e6ebf1; --bg:#f4f6f9; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#223; }
+  header{ background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.06); padding:16px; position:sticky; top:0; z-index:10; }
+  .wrap{ max-width:1200px; margin:0 auto; }
+  h1{ margin:0; font-size:20px; }
+  .sub{ color:var(--muted); font-size:13px; margin-top:4px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .user{ font-size:12px; color:#6b7a8c; }
+  .btn{ padding:8px 12px; border-radius:8px; border:0; cursor:pointer; font-size:13px; }
+  .btn.primary{ background:var(--prim); color:#fff; }
+  .btn.ghost{ background:#eef2f6; color:#223; }
+  .filters{ display:grid; gap:10px; grid-template-columns: repeat(6, 1fr); margin-top:12px; }
+  .filters .full{ grid-column:1/-1; }
+  .filters input, .filters select, .filters button{
+    width:100%; padding:8px 10px; border:1px solid #cfd6df; border-radius:8px; font-size:14px; outline:none;
+  }
+  .filters input:focus, .filters select:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
+  main{ max-width:1200px; margin:18px auto; padding:0 16px 24px; }
+  .card{ background:#fff; border-radius:12px; box-shadow:0 10px 28px rgba(0,0,0,.08); overflow:hidden; }
+  table{ width:100%; border-collapse:collapse; }
+  th, td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; }
+  th{ text-align:left; background:#f9fbff; }
+  tbody tr:hover{ background:#fbfdff; }
+  .num{ text-align:center; width:90px; }
+  .small{ font-size:12px; color:#6b7a8c; }
+  .row-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .toggle{ cursor:pointer; font-size:12px; color:var(--prim); border:0; background:transparent; }
+  .preview{ background:#fcfdfd; }
+  .preview td{ border-top:1px solid #edf2f7; }
+  .empty{ padding:18px; text-align:center; color:#6b7a8c; }
+  .k{ color:#3A6385; font-weight:700; }
+  a.btn{ text-decoration:none; display:inline-block; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Curadoria do Diário de Obra</h1>
+        <div class="sub">Filtre, visualize, edite e abra os detalhes de cada diário</div>
+      </div>
+      <div class="user">
+        <span id="who">—</span>
+        <button id="logout" class="btn ghost" title="Sair da sessão">Sair</button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="fObra" placeholder="Obra">
+      <input type="text" id="fResp" placeholder="Responsável">
+      <input type="date" id="fDataIni" title="Data inicial">
+      <input type="date" id="fDataFim" title="Data final">
+      <input type="number" id="fCodigo" placeholder="Cód. intercorrência">
+      <input type="text" id="fQ" placeholder="Busca livre (obs/descrições)">
+      <div class="full" style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn ghost" id="limpar">Limpar</button>
+        <button class="btn primary" id="buscar">Buscar</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap card">
+    <table id="grid">
+      <thead>
+        <tr>
+          <th style="width:12%">Data</th>
+          <th>Obra</th>
+          <th style="width:18%">Responsável</th>
+          <th class="num">Presentes</th>
+          <th class="num">Ausentes</th>
+          <th class="num">Férias</th>
+          <th style="width:22%">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" class="empty">Use os filtros acima e clique em <strong>Buscar</strong>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const API = location.origin;
+
+async function ensureAuth() {
+  const r = await fetch(`${API}/api/me`, { credentials: 'include' });
+  if (r.status === 401) { location.href = '/login.html'; return false; }
+  const j = await r.json().catch(()=>({}));
+  document.getElementById('who').textContent = j.user ? `Olá, ${j.user.username}` : '—';
+  return true;
+}
+document.getElementById('logout').addEventListener('click', async ()=>{
+  await fetch(`${API}/api/logout`, { method:'POST', credentials:'include' });
+  location.href = '/login.html';
+});
+
+async function fetchDiarios() {
+  const p = new URLSearchParams();
+  const obra = document.getElementById('fObra').value.trim();
+  const resp = document.getElementById('fResp').value.trim();
+  const di   = document.getElementById('fDataIni').value;
+  const df   = document.getElementById('fDataFim').value;
+  const cod  = document.getElementById('fCodigo').value.trim();
+  const q    = document.getElementById('fQ').value.trim();
+  if (obra) p.set('obra', obra);
+  if (resp) p.set('responsavel', resp);
+  if (di)   p.set('data_ini', di);
+  if (df)   p.set('data_fim', df);
+  if (cod)  p.set('codigo', cod);
+  if (q)    p.set('q', q);
+
+  const url = `${API}/api/diarios${p.toString() ? ('?' + p.toString()) : ''}`;
+  const r = await fetch(url, { credentials: 'include' });
+  if (!r.ok) throw new Error('Falha ao buscar diários');
+  return await r.json();
+}
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+function renderDiarios(rows){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  if(!rows.length){ tb.innerHTML = `<tr><td colspan="7" class="empty">Nenhum diário encontrado.</td></tr>`; return; }
+  rows.forEach(d=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.data}</td>
+      <td>${escapeHtml(d.obra)}</td>
+      <td>${escapeHtml(d.responsavel)}</td>
+      <td class="num k">${d.total_presentes ?? 0}</td>
+      <td class="num k">${d.total_ausentes ?? 0}</td>
+      <td class="num k">${d.total_ferias ?? 0}</td>
+      <td>
+        <div class="row-actions">
+          <button class="toggle" data-id="${d.id}">▼ Ausentes</button>
+          <a class="btn primary" href="details.html?id=${d.id}">Ver detalhes</a>
+          <a class="btn ghost" href="edit.html?id=${d.id}">Editar</a>
+        </div>
+      </td>
+    `;
+    tb.appendChild(tr);
+
+    const trPrev = document.createElement('tr');
+    trPrev.className = 'preview';
+    trPrev.style.display = 'none';
+    trPrev.innerHTML = `<td colspan="7">
+      <div class="small">Ausentes Identificados:</div>
+      <div id="prev-${d.id}" style="margin-top:8px;">
+        <span class="small">Carregando...</span>
+      </div>
+    </td>`;
+    tb.appendChild(trPrev);
+  });
+}
+async function togglePreview(id, btn){
+  const rowPrev = btn.closest('tr').nextSibling;
+  const box = document.getElementById(`prev-${id}`);
+  const open = rowPrev.style.display === 'none';
+  if(open){
+    if(!box.dataset.loaded){
+      try{
+        const r = await fetch(`${API}/api/diarios/${id}`, { credentials:'include' });
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.error||'Falha ao buscar detalhe');
+        const aus = Array.isArray(d.ausentes) ? d.ausentes : [];
+        if(!aus.length){ box.innerHTML = `<span class="small">Nenhum ausente informado.</span>`; }
+        else{
+          const tbl = document.createElement('table');
+          tbl.style.width='100%'; tbl.style.borderCollapse='collapse';
+          tbl.innerHTML = `
+            <thead><tr><th style="width:16%">Chapa</th><th>Nome</th><th style="width:30%">Função</th></tr></thead>
+            <tbody>${aus.map(a=>`<tr><td>${escapeHtml(a.chapa||'—')}</td><td>${escapeHtml(a.nome||'—')}</td><td>${escapeHtml(a.funcao||'—')}</td></tr>`).join('')}</tbody>
+          `;
+          box.innerHTML=''; box.appendChild(tbl);
+        }
+        box.dataset.loaded = '1';
+      }catch(e){ console.error(e); box.innerHTML = `<span class="small" style="color:#b33;">Não foi possível carregar os ausentes.</span>`; }
+    }
+    rowPrev.style.display = ''; btn.textContent = '▲ Ocultar ausentes';
+  }else{ rowPrev.style.display = 'none'; btn.textContent = '▼ Ausentes'; }
+}
+document.getElementById('buscar').addEventListener('click', async ()=>{
+  try{ const rows = await fetchDiarios(); renderDiarios(rows); }
+  catch(e){ alert('Erro ao buscar diários.'); console.error(e); }
+});
+document.getElementById('limpar').addEventListener('click', ()=>{
+  ['fObra','fResp','fDataIni','fDataFim','fCodigo','fQ'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="empty">Use os filtros acima e clique em <strong>Buscar</strong>.</td></tr>`;
+});
+document.getElementById('tbody').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.toggle'); if(!btn) return; togglePreview(btn.dataset.id, btn);
+});
+window.addEventListener('DOMContentLoaded', async ()=>{
+  const ok = await ensureAuth(); if(!ok) return;
+  try{ const rows = await fetchDiarios(); renderDiarios(rows); }catch(e){ /* silencioso */ }
+});
+</script>
+</body>
+</html>

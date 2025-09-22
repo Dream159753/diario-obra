@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar • Diário de Obra</title>
+<style>
+  :root{ --prim:#3A6385; --muted:#6b7a8c; --line:#e6ebf1; --bg:#f4f6f9; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#223; display:grid; place-items:center; height:100svh; }
+  .card{ width:min(420px,92vw); background:#fff; border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.10); padding:22px; }
+  h1{ margin:0 0 6px; font-size:20px; color:#223; }
+  p.sub{ margin:0 0 18px; font-size:13px; color:var(--muted); }
+  label{ display:block; font-size:13px; margin:10px 0 6px; color:#334; }
+  input{ width:100%; padding:10px 12px; border:1px solid #cfd6df; border-radius:10px; font-size:14px; outline:none; }
+  input:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
+  .row{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:12px; }
+  button{ width:100%; padding:12px 14px; border:0; border-radius:10px; background:var(--prim); color:#fff; font-size:15px; cursor:pointer; }
+  button:hover{ filter:brightness(.95); }
+  .err{ background:#fdecea; border:1px solid #f7c6c1; color:#ab2a20; padding:8px 10px; border-radius:8px; font-size:13px; display:none; margin-top:10px; }
+  .muted{ font-size:12px; color:#7d8aa0; text-align:center; margin-top:14px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Entrar</h1>
+    <p class="sub">Acesse a curadoria do Diário de Obra</p>
+
+    <form id="form">
+      <label>Usuário</label>
+      <input type="text" name="username" autocomplete="username" required placeholder="ex.: engenheiro">
+
+      <label>Senha</label>
+      <input type="password" name="password" autocomplete="current-password" required placeholder="••••••">
+
+      <div class="row">
+        <span style="font-size:12px;color:#8593a8">Dica (primeiro acesso): <code>engenheiro / 123456</code></span>
+      </div>
+
+      <div id="err" class="err"></div>
+
+      <button type="submit">Entrar</button>
+    </form>
+
+    <div class="muted">Problemas para acessar? Fale com o administrador.</div>
+  </div>
+
+<script>
+const API = location.origin;
+
+document.getElementById('form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const err = document.getElementById('err'); err.style.display='none';
+
+  try{
+    const r = await fetch(`${API}/api/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data),
+      credentials:'include'
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ err.textContent = j.error || 'Falha ao entrar.'; err.style.display='block'; return; }
+    // ok -> vai para viewer
+    location.href = 'viewer.html';
+  }catch(ex){
+    err.textContent = 'Não foi possível conectar ao servidor.'; err.style.display='block';
+  }
+});
+</script>
+</body>
+</html>

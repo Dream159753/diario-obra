@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Diário de Obra — Início</title>
+<style>
+  :root { --prim:#3A6385; --muted:#66758a; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100dvh; display:grid; place-items:center;
+    font-family: Arial, sans-serif; background:#f4f6f9; color:#233;
+    padding:24px;
+  }
+  .card{
+    width:100%; max-width:720px; background:#fff; border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,.08); overflow:hidden;
+  }
+  header{
+    padding:20px 24px; background:#f9fbfd; border-bottom:1px solid #eef2f6;
+  }
+  header h1{ margin:0; font-size:20px; color:#333; }
+  header p{ margin:6px 0 0; font-size:13px; color:var(--muted); }
+  main{ padding:20px 24px; }
+  .actions{ display:flex; gap:12px; flex-wrap:wrap; }
+  .btn{
+    display:inline-block; padding:12px 18px; border-radius:8px; border:0;
+    background:var(--prim); color:#fff; font-size:15px; text-decoration:none;
+    cursor:pointer; transition:.15s ease; text-align:center;
+  }
+  .btn:hover{ filter:brightness(.96); transform:translateY(-1px); }
+  .muted{ font-size:12px; color:var(--muted); margin-top:14px; }
+  footer{ padding:14px 24px; background:#f9fbfd; border-top:1px solid #eef2f6; font-size:12px; color:var(--muted); }
+  code{ background:#eef2f6; padding:2px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>📒 Diário de Obra</h1>
+      <p>Início</p>
+    </header>
+    <main>
+      <div class="actions">
+        <a class="btn" href="form.html">Abrir Diário (form.html)</a>
+      </div>
+      <p class="muted">Ao publicar online, o formulário usará a mesma URL deste site para acessar <code>/api/.../</code>.</p>
+    </main>
+    <footer>
+      <span id="apiInfo">API preparada.</span>
+    </footer>
+  </div>
+
+  <script>
+    // Disponibiliza a base da API: local usa localhost, online usa o mesmo domínio (sem CORS).
+    const API = (location.hostname === 'localhost') ? 'http://localhost:3000' : '';
+    window.API = API;
+    // Informação simples no rodapé (opcional)
+    document.getElementById('apiInfo').textContent = 'API: ' + (API || '(mesmo domínio) /api');
+  </script>
+</body>
+</html>

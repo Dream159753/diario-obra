@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin • Usuários</title>
+<style>
+  :root{ --prim:#3A6385; --muted:#6b7a8c; --line:#e6ebf1; --bg:#f4f6f9; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#223; }
+  header{ background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.06); padding:16px; position:sticky; top:0; z-index:10; }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ margin:0 0 4px; font-size:20px; }
+  .sub{ color:var(--muted); font-size:13px; }
+  .actions{ display:flex; gap:8px; align-items:center; }
+  .btn{ padding:8px 12px; border-radius:8px; border:0; cursor:pointer; font-size:13px; }
+  .btn.primary{ background:var(--prim); color:#fff; }
+  .btn.ghost{ background:#eef2f6; color:#223; }
+  main{ max-width:1100px; margin:18px auto; padding:0 16px 24px; }
+  .card{ background:#fff; border-radius:12px; box-shadow:0 10px 28px rgba(0,0,0,.08); padding:16px; margin-bottom:16px; }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; text-align:left; }
+  th{ background:#f9fbff; }
+  .small{ font-size:12px; color:#6b7a8c; }
+  .tag{ padding:2px 8px; border-radius:999px; background:#eef2f6; font-size:12px; }
+  .tag.admin{ background:#ffe7c2; }
+  .tag.off{ background:#fdecea; color:#b13; }
+  form.inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input,select{ padding:8px 10px; border:1px solid #cfd6df; border-radius:8px; outline:none; font-size:14px; }
+  input:focus,select:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div>
+        <h1>Admin • Gestão de Usuários</h1>
+        <div class="sub">Crie, altere e (des)ative logins de acesso</div>
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="/viewer.html">Ir para Curadoria</a>
+        <button id="logout" class="btn ghost">Sair</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin:0 0 10px;">Novo usuário</h2>
+      <form id="fNew" class="inline">
+        <input name="username" placeholder="Usuário" required>
+        <input name="password" placeholder="Senha inicial" required>
+        <select name="role">
+          <option value="engenheiro">engenheiro</option>
+          <option value="admin">admin</option>
+        </select>
+        <button class="btn primary" type="submit">Criar</button>
+        <span class="small">Dica: crie logins por engenheiro e troque a senha no primeiro acesso.</span>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 10px;">Usuários</h2>
+      <table>
+        <thead>
+          <tr><th>Usuário</th><th>Perfil</th><th>Status</th><th>Criado em</th><th style="width:40%">Ações</th></tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="5" class="small">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = location.origin;
+
+async function ensureAdmin(){
+  const r = await fetch(`${API}/api/me`, {credentials:'include'});
+  if (r.status===401) { location.href='/login.html'; return false; }
+  const j = await r.json();
+  if (j.user?.role!=='admin') { alert('Acesso restrito a administradores.'); location.href='/viewer.html'; return false; }
+  return true;
+}
+
+document.getElementById('logout').addEventListener('click', async ()=>{
+  await fetch(`${API}/api/logout`, {method:'POST', credentials:'include'});
+  location.href='/login.html';
+});
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
+
+async function listUsers(){
+  const r = await fetch(`${API}/api/users`, {credentials:'include'});
+  if(!r.ok){ alert('Falha ao listar usuários'); return; }
+  const rows = await r.json();
+  const tb = document.getElementById('tbody'); tb.innerHTML='';
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="5" class="small">Nenhum usuário.</td></tr>'; return; }
+  rows.forEach(u=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${esc(u.username)}</td>
+      <td><span class="tag ${u.role==='admin'?'admin':''}">${u.role}</span></td>
+      <td>${u.active? 'ativo' : '<span class="tag off">inativo</span>'}</td>
+      <td class="small">${esc(u.created_at||'—')}</td>
+      <td>
+        <form data-id="${u.id}" class="inline fEdit">
+          <input name="password" placeholder="Nova senha" style="min-width:140px">
+          <select name="role">
+            <option value="engenheiro" ${u.role==='engenheiro'?'selected':''}>engenheiro</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
+          </select>
+          <input name="username" placeholder="Trocar usuário" value="${esc(u.username)}" style="min-width:140px">
+          <button class="btn primary" type="submit">Salvar</button>
+          <button class="btn ghost toggle" type="button">${u.active?'Desativar':'Reativar'}</button>
+        </form>
+      </td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+document.getElementById('fNew').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const r = await fetch(`${API}/api/users`, {
+    method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok){ alert(j.error||'Erro ao criar'); return; }
+  e.target.reset();
+  listUsers();
+});
+
+document.getElementById('tbody').addEventListener('submit', async (e)=>{
+  if (!e.target.classList.contains('fEdit')) return;
+  e.preventDefault();
+  const id = e.target.dataset.id;
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const r = await fetch(`${API}/api/users/${id}`, {
+    method:'PATCH', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok){ alert(j.error||'Erro ao salvar'); return; }
+  listUsers();
+});
+
+document.getElementById('tbody').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.toggle'); if(!btn) return;
+  const form = btn.closest('form'); const id = form.dataset.id;
+  const r = await fetch(`${API}/api/users/${id}/toggle-active`, { method:'POST', credentials:'include' });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok){ alert(j.error||'Erro ao alternar status'); return; }
+  listUsers();
+});
+
+window.addEventListener('DOMContentLoaded', async ()=>{
+  const ok = await ensureAdmin(); if(!ok) return;
+  listUsers();
+});
+</script>
+</body>
+</html>
