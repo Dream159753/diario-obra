@@ -11,6 +11,7 @@ const { parse } = require('csv-parse/sync');
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true })); // <— NOVO: aceita forms (x-www-form-urlencoded)
 
 // ===== Sessão =====
 app.use(session({
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user'  -- 'user' ou 'admin'
+  role TEXT NOT NULL DEFAULT 'user'
 );
 `);
 
@@ -82,10 +83,8 @@ function seedFuncionariosCSV(){
   try{
     const csvPath = path.join(__dirname, 'funcionarios.csv');
     if(!fs.existsSync(csvPath)) return;
-
     const buf = fs.readFileSync(csvPath);
     const rows = parse(buf.toString(), { columns: true, skip_empty_lines: true, delimiter: ';' });
-
     const insert = db.prepare(`INSERT OR REPLACE INTO funcionarios (chapa,nome,funcao) VALUES (?,?,?)`);
     const insertMany = db.transaction((list)=>{
       for(const r of list){
@@ -123,7 +122,6 @@ app.post('/api/login', (req,res)=>{
 
   const user = db.prepare(`SELECT * FROM users WHERE email=?`).get(email);
   if(!user) return res.status(400).json({ error:'Usuário ou senha inválidos' });
-
   if(!bcrypt.compareSync(password, user.password_hash)){
     return res.status(400).json({ error:'Usuário ou senha inválidos' });
   }
@@ -267,8 +265,6 @@ app.get(['/admin.html'], requireAuth, requireRole('admin'), (req,res,next)=>next
 
 // ===== Estáticos e rota raiz =====
 app.use(express.static('.'));
-
-// Raiz pública abre a index (form e index são públicos)
 app.get('/', (_req,res)=>res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 3000;
