@@ -1,124 +1,135 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Entrar • Diário de Obra</title>
-<style>
-  :root{ --prim:#3A6385; --muted:#6b7a8c; --line:#e6ebf1; --bg:#f4f6f9; }
-  *{ box-sizing:border-box; }
-  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#223; display:grid; place-items:center; height:100svh; }
-  .card{ width:min(420px,92vw); background:#fff; border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.10); padding:22px; }
-  h1{ margin:0 0 6px; font-size:20px; color:#223; }
-  p.sub{ margin:0 0 18px; font-size:13px; color:var(--muted); }
-  label{ display:block; font-size:13px; margin:10px 0 6px; color:#334; }
-  input{ width:100%; padding:10px 12px; border:1px solid #cfd6df; border-radius:10px; font-size:14px; outline:none; }
-  input:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
-  .row{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:12px; }
-  button{ width:100%; padding:12px 14px; border:0; border-radius:10px; background:var(--prim); color:#fff; font-size:15px; cursor:pointer; }
-  button:hover{ filter:brightness(.95); }
-  .err{ background:#fdecea; border:1px solid #f7c6c1; color:#ab2a20; padding:8px 10px; border-radius:8px; font-size:13px; display:none; margin-top:10px; }
-  .muted{ font-size:12px; color:#7d8aa0; text-align:center; margin-top:14px; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Entrar — Diário de Obra</title>
+  <style>
+    :root { --bg:#f3f6fb; --card:#fff; --text:#223; --muted:#6b7a90; --prim:#3A6385; --prim-700:#2f516b; --danger:#c0392b; --shadow:0 18px 55px rgba(0,0,0,.09); }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, Helvetica, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -50%, rgba(58,99,133,.10), transparent 60%), var(--bg);
+      color:var(--text); display:grid; place-items:center;
+    }
+    .wrap{ width:100%; max-width:860px; padding:32px 20px; }
+    .card{
+      max-width:520px; margin:0 auto; background:var(--card); border-radius:16px; box-shadow:var(--shadow);
+      padding:26px 26px 18px;
+    }
+    h1{ margin:0 0 6px; font-size:26px; letter-spacing:.2px; }
+    .sub{ margin:0 0 18px; font-size:14px; color:var(--muted); }
+    label{ display:block; font-size:14px; margin:10px 0 6px; color:#2a2f36; }
+    input{
+      width:100%; padding:12px 14px; border:1px solid #cfd6df; border-radius:10px; font-size:15px; outline:none;
+      background:#eef4ff66;
+    }
+    input:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.15); background:#fff; }
+    .hint{ margin-top:8px; font-size:12px; color:var(--muted); }
+    .msg{
+      margin:14px 0 0; padding:10px 12px; border-radius:10px; background:#fdecea; color:var(--danger);
+      border:1px solid #f7c6c1; display:none;
+    }
+    .actions{ margin-top:14px; }
+    button{
+      width:100%; padding:12px 16px; border:0; border-radius:12px; cursor:pointer;
+      background:var(--prim); color:#fff; font-size:16px; font-weight:600;
+    }
+    button:hover{ filter:brightness(.96); }
+    button:disabled{ opacity:.6; cursor:not-allowed; }
+    .foot{ text-align:center; font-size:12px; color:var(--muted); margin-top:14px; }
+  </style>
 </head>
-  <script>
-(function () {
-  const form = document.querySelector('form');       // usa o seu form existente
-  if (!form) return;
-  // usa um container de mensagem se existir, senão cria um
-  let msg = document.getElementById('msg');
-  if (!msg) {
-    msg = document.createElement('div');
-    msg.id = 'msg';
-    msg.style.marginTop = '8px';
-    msg.style.color = '#c0392b';
-    form.appendChild(msg);
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    msg.textContent = '';
-
-    // Captura tanto nomes "email/password" quanto "usuario/senha" (ou ids)
-    const email = (
-      form.querySelector('[name="email"], [name="usuario"], #email, #usuario')?.value || ''
-    ).trim();
-    const password = (
-      form.querySelector('[name="password"], [name="senha"], #password, #senha')?.value || ''
-    );
-
-    if (!email || !password) {
-      msg.textContent = 'Informe email e senha';
-      return;
-    }
-
-    try {
-      const r = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password })
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        msg.textContent = data.error || 'Usuário ou senha inválidos';
-        return;
-      }
-      // login ok → vai para a viewer
-      location.href = 'viewer.html';
-    } catch (err) {
-      msg.textContent = 'Não foi possível conectar ao servidor.';
-    }
-  });
-})();
-</script>
-
 <body>
-  <div class="card">
-    <h1>Entrar</h1>
-    <p class="sub">Acesse a curadoria do Diário de Obra</p>
+  <div class="wrap">
+    <div class="card">
+      <h1>Entrar</h1>
+      <p class="sub">Acesse a curadoria do Diário de Obra</p>
 
-    <form id="form">
-      <label>Usuário</label>
-      <input type="text" name="username" autocomplete="username" required placeholder="ex.: engenheiro">
+      <!-- FORMULÁRIO -->
+      <form id="loginForm" autocomplete="on" novalidate>
+        <label for="usuario">Usuário</label>
+        <!-- Mantemos estes nomes/id para compatibilidade com seu layout -->
+        <input id="usuario" name="usuario" type="email" placeholder="email@obra.local" required />
 
-      <label>Senha</label>
-      <input type="password" name="password" autocomplete="current-password" required placeholder="••••••">
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" placeholder="••••••••" required />
 
-      <div class="row">
-        <span style="font-size:12px;color:#8593a8">Dica (primeiro acesso): <code>engenheiro / 123456</code></span>
-      </div>
+        <div class="hint">Dica (primeiro acesso): <strong>engenheiro</strong> / <strong>123456</strong></div>
 
-      <div id="err" class="err"></div>
+        <div id="msg" class="msg">Informe email e senha</div>
 
-      <button type="submit">Entrar</button>
-    </form>
+        <div class="actions">
+          <button type="submit" id="btnLogin">Entrar</button>
+        </div>
+      </form>
 
-    <div class="muted">Problemas para acessar? Fale com o administrador.</div>
+      <p class="foot">Problemas para acessar? Fale com o administrador.</p>
+    </div>
   </div>
 
-<script>
-const API = location.origin;
+  <script>
+  (function () {
+    const form = document.getElementById('loginForm');
+    const btn = document.getElementById('btnLogin');
+    const msg = document.getElementById('msg');
 
-document.getElementById('form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target).entries());
-  const err = document.getElementById('err'); err.style.display='none';
+    // Se já estiver logado, vai direto para a viewer
+    (async () => {
+      try {
+        const me = await fetch('/api/me', { credentials:'include' }).then(r=>r.json());
+        if (me && me.user) location.href = 'viewer.html';
+      } catch(_) {}
+    })();
 
-  try{
-    const r = await fetch(`${API}/api/login`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data),
-      credentials:'include'
+    function showError(text){
+      msg.textContent = text || 'Falha no login';
+      msg.style.display = 'block';
+    }
+    function clearError(){ msg.style.display='none'; msg.textContent=''; }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+
+      // Captura tanto "usuario/senha" quanto "email/password" se mudar no futuro
+      const emailEl = form.querySelector('[name="email"], #email, [name="usuario"], #usuario, input[type="email"]');
+      const passEl  = form.querySelector('[name="password"], #password, [name="senha"], #senha, input[type="password"]');
+
+      const email = (emailEl && emailEl.value || '').trim();
+      const password = passEl ? passEl.value : '';
+
+      if(!email || !password){
+        showError('Informe email e senha');
+        return;
+      }
+
+      btn.disabled = true;
+
+      try{
+        const r = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await r.json().catch(()=> ({}));
+
+        if(!r.ok){
+          showError(data.error || 'Usuário ou senha inválidos');
+          btn.disabled = false;
+          return;
+        }
+        // sucesso → redireciona
+        location.href = 'viewer.html';
+      }catch(err){
+        showError('Não foi possível conectar ao servidor.');
+        btn.disabled = false;
+      }
     });
-    const j = await r.json().catch(()=>({}));
-    if(!r.ok){ err.textContent = j.error || 'Falha ao entrar.'; err.style.display='block'; return; }
-    // ok -> vai para viewer
-    location.href = 'viewer.html';
-  }catch(ex){
-    err.textContent = 'Não foi possível conectar ao servidor.'; err.style.display='block';
-  }
-});
-</script>
+  })();
+  </script>
 </body>
 </html>
-
