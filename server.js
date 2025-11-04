@@ -1,4 +1,4 @@
-// server.js — Diário de Obra (auth + gestão de usuários)  [com FÉRIAS]
+// server.js — Diário de Obra (auth + gestão de usuários)
 const express = require('express');
 const cors = require('cors');
 const Database = require('better-sqlite3');
@@ -11,7 +11,7 @@ const { parse } = require('csv-parse/sync');
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true })); // <— NOVO: aceita forms (x-www-form-urlencoded)
+app.use(express.urlencoded({ extended: true })); // aceita forms também
 
 // ===== Sessão =====
 app.use(session({
@@ -67,18 +67,27 @@ CREATE TABLE IF NOT EXISTS users (
 );
 `);
 
-// ===== Seeds mínimas =====
-function seedAdmin(){
-  const row = db.prepare(`SELECT id FROM users WHERE email=?`).get('admin@obra.local');
-  if(!row){
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare(`INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`)
-      .run('Administrador', 'admin@obra.local', hash, 'admin');
-    console.log('Seed: admin@obra.local / admin123');
+// ===== Seeds de usuários (admin + engenheiro) =====
+function seedUsers(){
+  const defaults = [
+    { name:'Administrador', email:'admin@obra.local',      password:'admin123', role:'admin' },
+    { name:'Engenheiro',    email:'engenheiro@obra.local', password:'123456',  role:'user'  }
+  ];
+  const findByEmail = db.prepare(`SELECT id FROM users WHERE email=?`);
+  const insertUser  = db.prepare(`INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`);
+
+  for (const u of defaults){
+    const found = findByEmail.get(u.email);
+    if (!found){
+      const hash = bcrypt.hashSync(u.password, 10);
+      insertUser.run(u.name, u.email, hash, u.role);
+      console.log(`Seed user: ${u.email} / ${u.password}`);
+    }
   }
 }
-seedAdmin();
+seedUsers();
 
+// ===== Seed Funcionários de CSV (opcional) =====
 function seedFuncionariosCSV(){
   try{
     const csvPath = path.join(__dirname, 'funcionarios.csv');
@@ -102,7 +111,7 @@ function seedFuncionariosCSV(){
 }
 seedFuncionariosCSV();
 
-// ===== Auth helpers =====
+// ===== Helpers de auth =====
 function requireAuth(req,res,next){
   if(!req.session.user) return res.status(401).json({ error:'Não autenticado' });
   next();
@@ -143,13 +152,25 @@ app.get('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
   res.json(list);
 });
 
+// <<< AQUI FOI A MUDANÇA IMPORTANTE >>>
 app.post('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
-  const { name, email, password, role } = req.body || {};
-  if(!name || !email || !password) return res.status(400).json({ error:'Campos obrigatórios faltando' });
+  let { name, email, password, role } = req.body || {};
+
+  if(!email || !password){
+    return res.status(400).json({ error:'Campos obrigatórios faltando' });
+  }
+
+  email = String(email).trim();
+  // se não vier name, usa a parte antes do @ do email
+  if(!name || !String(name).trim()){
+    name = email.includes('@') ? email.split('@')[0] : email;
+  }
+
   const hash = bcrypt.hashSync(password, 10);
   try{
-    const info = db.prepare(`INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`)
-      .run(name, email, hash, role || 'user');
+    const info = db.prepare(
+      `INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`
+    ).run(name, email, hash, role || 'user');
     res.json({ id: info.lastInsertRowid });
   }catch(err){
     res.status(400).json({ error: err.message });
@@ -181,7 +202,7 @@ app.delete('/api/users/:id', requireAuth, requireRole('admin'), (req,res)=>{
 
 // ===== Diários =====
 app.post('/api/diarios', (req,res)=>{
-  const { obra, responsavel, data, observacoes, funcoes, intercorrencias, ausentes } = req.body || {};
+  const { obra, responsavel, data, observacoes, funcoes, intercorrencias } = req.body || {};
   if(!obra || !responsavel || !data) return res.status(400).json({ error:'Campos obrigatórios faltando' });
 
   const insertDiario = db.prepare(`INSERT INTO diario (obra,responsavel,data,observacoes) VALUES (?,?,?,?)`);
@@ -195,7 +216,13 @@ app.post('/api/diarios', (req,res)=>{
 
       if(Array.isArray(funcoes)){
         for(const f of funcoes){
-          insertFunc.run(id, f.funcao, Number(f.presente||0), Number(f.ausente||0), Number(f.ferias||0));
+          insertFunc.run(
+            id,
+            f.funcao,
+            Number(f.presente||0),
+            Number(f.ausente||0),
+            Number(f.ferias||0)
+          );
         }
       }
       if(Array.isArray(intercorrencias)){
@@ -259,11 +286,11 @@ app.get('/api/funcionarios/:chapa', (req,res)=>{
   res.json(row);
 });
 
-// ===== Proteger HTMLs (apenas viewer / details / admin exigem login) =====
+// ===== Proteção de páginas =====
 app.get(['/viewer.html','/details.html'], requireAuth, (req,res,next)=>next());
 app.get(['/admin.html'], requireAuth, requireRole('admin'), (req,res,next)=>next());
 
-// ===== Estáticos e rota raiz =====
+// ===== Estáticos e raiz =====
 app.use(express.static('.'));
 app.get('/', (_req,res)=>res.sendFile(path.join(__dirname, 'index.html')));
 
