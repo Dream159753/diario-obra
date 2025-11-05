@@ -88,7 +88,7 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <!-- todas as funções -->
+        <!-- (todas as funções) -->
         <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
@@ -173,11 +173,11 @@
 
 <script>
 /* ====== CONFIG API ====== */
-/* IMPORTANTÍSSIMO: string vazia = mesma origem (Render) */
-const API = '';
+const API = ''; // mesma origem (Render ou local)
 
-/* Catálogo */
+/* Catálogo (AGORA com código 0 também) */
 const CATALOG = [
+  {code:0,  title:'Sem intercorrencias', model:'Não houve intercorrencias que afetam a produção.'},
   {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
   {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
   {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
@@ -192,11 +192,13 @@ const CATALOG = [
   {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
 ];
 
-/* FUNÇÕES (simplificadas + detalhadas) */
+/* LISTA DE FUNÇÕES PARA O SELECT DOS AUSENTES */
 const FUNCOES = [
   "ADMINISTRATIVO",
   "MESTRE",
   "ENCARREGADO",
+
+  // SIMPLIFICADAS (CSV)
   "CARPINTEIRO",
   "ARMADOR",
   "PEDREIRO",
@@ -205,6 +207,8 @@ const FUNCOES = [
   "SINALEIRO",
   "SOLDADOR",
   "TEC. DE SEGURANÇA DO TRABALHO",
+
+  // DETALHADAS
   "CARPINTEIRO TORRE","CARPINTEIRO PERIFERIA",
   "CARPINTEIRO DE PROTEÇÃO","CARPINTEIRO SERRA E CAIXINHA",
   "ARMADOR TORRE","ARMADOR PERIFERIA","ARMADOR ENROLANDO ARAME",
@@ -241,7 +245,7 @@ function renderTotalGeral(){
   document.getElementById('totalGeral').textContent = totalGeral();
 }
 
-/* ======= AUSENTES (autocomplete) ======= */
+/* ======= AUSENTES (com autocomplete por chapa) ======= */
 function optFuncoesHTML(){
   return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join('');
 }
@@ -252,6 +256,7 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
+  // Buscar funcionário pela chapa ao sair do campo
   inputChapa.addEventListener('blur', async ()=>{
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
@@ -277,6 +282,7 @@ function wireChapaAutocomplete(tr){
     }
   });
 
+  // Autocomplete de chapas
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
     const term = inputChapa.value.trim();
@@ -299,7 +305,7 @@ function wireChapaAutocomplete(tr){
 
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8);
+  const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
   tr.innerHTML=`
     <td>
       <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
@@ -370,7 +376,7 @@ function autoDescricaoPorCodigo(inputCodigo){
   if(item && (!desc.value || desc.value.trim()==="")) desc.value=`${item.title} — ${item.model}`;
 }
 
-/* ======= EVENTOS GERAIS ======= */
+/* ======= EVENTOS ======= */
 document.getElementById('tbody').addEventListener('input', e=>{
   if(e.target.matches('input[type="number"]')){
     atualizarLinha(e.target.closest('tr'));
@@ -378,7 +384,6 @@ document.getElementById('tbody').addEventListener('input', e=>{
     atualizarBadgeAusentes();
   }
 });
-
 document.getElementById('limpar').addEventListener('click', ()=>{
   document.querySelectorAll('#diarioForm input[type="number"]').forEach(i=>i.value=0);
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
@@ -392,7 +397,6 @@ document.getElementById('limpar').addEventListener('click', ()=>{
   atualizarBadgeAusentes();
   atualizarBadgeInter();
 });
-
 document.getElementById('addAusente').addEventListener('click', ()=>{
   document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente());
   atualizarBadgeAusentes();
@@ -428,7 +432,6 @@ document.getElementById('tbodyInter').addEventListener('change', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
 });
 
-/* botão ver/esconder catálogo */
 document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
   const cat = document.getElementById('catalogo');
   cat.style.display = cat.style.display === 'block' ? 'none' : 'block';
@@ -442,7 +445,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   atualizarBadgeInter();
 });
 
-/* ======= BACKEND DIÁRIO ======= */
+/* ======= INTEGRAÇÃO COM O BACKEND ======= */
 function coletarPayload(){
   const obra        = document.querySelector('[name="obra"]').value.trim();
   const responsavel = document.querySelector('[name="responsavel"]').value.trim();
@@ -500,7 +503,7 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   }
 });
 
-/* ======= PDF ======= */
+/* ======= SALVAR EM PDF (impressão) ======= */
 document.getElementById('btnPdf').addEventListener('click', ()=>{
   window.print();
 });
