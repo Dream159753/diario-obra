@@ -172,7 +172,6 @@
 
 <script>
 /* ====== CONFIG API ====== */
-// usa o mesmo domínio da página (funciona local e no Render)
 const API = window.location.origin;
 
 /* Catálogo (removidos: 13,14,17,21,23,24,27,29) */
@@ -235,7 +234,6 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  // busca funcionário pela chapa (usado em blur + change)
   async function buscarFuncionarioPorChapa(){
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
@@ -243,19 +241,36 @@ function wireChapaAutocomplete(tr){
       const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
       if(r.ok){
         const f = await r.json();
+        console.log('Funcionario retornado:', f);
 
-        // nome: aceita várias formas de campo, só por garantia
-        inputNome.value = f.nome || f.NOME || f.nome_funcionario || '';
+        // pega nome em qualquer chave que contenha "nome"
+        let nomeVal = f.nome || f.NOME || f.Nome || f.nome_funcionario;
+        if(!nomeVal){
+          for(const k in f){
+            if(k.toLowerCase().includes('nome')){
+              nomeVal = f[k];
+              break;
+            }
+          }
+        }
+        inputNome.value = nomeVal || '';
 
         // função: tenta casar ignorando acento, caixa e espaço
-        const funcBruta = f.funcao || f.FUNCAO || '';
-        const alvoNorm  = normaliza(funcBruta);
+        let funcVal = f.funcao || f.FUNCAO || f.Funcao;
+        if(!funcVal){
+          for(const k in f){
+            if(k.toLowerCase().includes('func')){
+              funcVal = f[k];
+              break;
+            }
+          }
+        }
+        const alvoNorm  = normaliza(funcVal);
 
         const options = Array.from(selectFunc.options);
         let chosen = options.find(o => normaliza(o.value) === alvoNorm);
 
         if(!chosen && alvoNorm){
-          // tenta "contém" caso no CSV venha algo tipo "PEDREIRO MASSA / ARREMATE"
           chosen = options.find(o => {
             const optNorm = normaliza(o.value);
             return optNorm && (optNorm.includes(alvoNorm) || alvoNorm.includes(optNorm));
@@ -265,7 +280,6 @@ function wireChapaAutocomplete(tr){
         if(chosen){
           selectFunc.value = chosen.value;
         }else{
-          // se não achar nada, pelo menos seleciona "Selecione..."
           selectFunc.value = '';
         }
       }
@@ -274,7 +288,6 @@ function wireChapaAutocomplete(tr){
     }
   }
 
-  // quando sai do campo ou escolhe no datalist
   inputChapa.addEventListener('blur', buscarFuncionarioPorChapa);
   inputChapa.addEventListener('change', buscarFuncionarioPorChapa);
 
@@ -287,9 +300,10 @@ function wireChapaAutocomplete(tr){
       try{
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
         const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista.map(p =>
-          `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`
-        ).join('');
+        dl.innerHTML = lista.map(p =>{
+          const nomeSug = p.nome || p.NOME || p.Nome || p.nome_funcionario || '';
+          return `<option value="${p.chapa}" label="${nomeSug.replace(/"/g,'&quot;')}"></option>`;
+        }).join('');
       }catch{
         dl.innerHTML='';
       }
@@ -299,7 +313,7 @@ function wireChapaAutocomplete(tr){
 
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
+  const uid = 'dl_' + Math.random().toString(36).slice(2,8);
   tr.innerHTML=`
     <td>
       <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
@@ -462,7 +476,6 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
 
-  // trava básica para obrigar pelo menos 1 intercorrência preenchida
   const temInterValida = payload.intercorrencias.some(i => i.codigo || i.descricao);
   if(!temInterValida){
     alert('Preencha pelo menos uma intercorrência antes de salvar o diário.');
