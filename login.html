@@ -92,11 +92,11 @@
   <form id="loginForm" autocomplete="off">
     <div class="field">
       <label for="usuario">Usuário</label>
-      <input type="text" id="usuario" name="usuario" required placeholder="Digite o usuário">
+      <input type="text" id="usuario" name="usuario" placeholder="Digite o usuário">
     </div>
     <div class="field">
       <label for="senha">Senha</label>
-      <input type="password" id="senha" name="senha" required placeholder="Digite a senha">
+      <input type="password" id="senha" name="senha" placeholder="Digite a senha">
     </div>
     <button type="submit" class="btn">Entrar</button>
   </form>
@@ -117,26 +117,22 @@
 
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    msg.textContent = '';
+
+    msg.textContent = 'Autenticando...';
     msg.className = 'msg';
 
-    const usuario = document.getElementById('usuario').value.trim();
-    const senha   = document.getElementById('senha').value.trim();
-
-    if(!usuario || !senha){
-      msg.textContent = 'Usuário e senha são obrigatórios.';
-      msg.classList.add('err');
-      return;
-    }
+    const usuario = document.getElementById('usuario').value;
+    const senha   = document.getElementById('senha').value;
 
     try{
       const resp = await fetch(`${API}/api/login`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        // AQUI A CORREÇÃO: backend espera "email"
+        // BACKEND ESPERA "email" E "senha"
         body: JSON.stringify({ email: usuario, senha })
       });
-      const data = await resp.json().catch(()=>({}));
+
+      const data = await resp.json().catch(()=> ({}));
 
       if(!resp.ok){
         msg.textContent = data.error || 'Usuário ou senha inválidos.';
