@@ -152,25 +152,47 @@ app.get('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
   res.json(list);
 });
 
-// <<< AQUI FOI A MUDANÇA IMPORTANTE >>>
+// POST /api/users — usado pelo admin.html para criar novo usuário
 app.post('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
-  let { name, email, password, role } = req.body || {};
+  let body = req.body || {};
 
-  if(!email || !password){
+  // aceita vários nomes de campos vindos do front
+  let email = (
+    body.email ||
+    body.usuario ||
+    body.user ||
+    body.login ||
+    ''
+  );
+  let password = (
+    body.password ||
+    body.senha ||
+    body.pass ||
+    body.novaSenha ||
+    ''
+  );
+  let role = body.role || body.perfil || 'user';
+  let name = body.name || body.nome || '';
+
+  email = String(email).trim();
+  password = String(password).trim();
+  role = String(role || 'user').trim();
+
+  if (!email || !password){
     return res.status(400).json({ error:'Campos obrigatórios faltando' });
   }
 
-  email = String(email).trim();
-  // se não vier name, usa a parte antes do @ do email
-  if(!name || !String(name).trim()){
+  // se não vier name, usa o pedaço antes do @
+  if (!name || !String(name).trim()){
     name = email.includes('@') ? email.split('@')[0] : email;
   }
 
   const hash = bcrypt.hashSync(password, 10);
+
   try{
     const info = db.prepare(
       `INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`
-    ).run(name, email, hash, role || 'user');
+    ).run(name, email, hash, role);
     res.json({ id: info.lastInsertRowid });
   }catch(err){
     res.status(400).json({ error: err.message });
