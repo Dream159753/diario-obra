@@ -10,8 +10,16 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// servir arquivos estáticos (index.html, login.html, form.html, viewer.html etc.)
-app.use(express.static(path.join(__dirname, 'public')));
+// ===== DIRETÓRIO PÚBLICO (ONDE ESTÃO index.html, form.html, login.html, viewer.html etc.) =====
+const PUBLIC_DIR = path.join(__dirname);
+
+// servir arquivos estáticos (HTML, CSS, JS) diretamente da pasta do projeto
+app.use(express.static(PUBLIC_DIR));
+
+// rota explícita para a página inicial -> index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
 
 // ===== ARQUIVO DE DIÁRIOS (JSON SIMPLES) =====
 const DB_DIR = path.join(__dirname, 'data');
@@ -61,7 +69,6 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
   }
 
-  // retorno simples, sem token/jwt
   res.json({
     username: user.username,
     role: user.role
@@ -79,7 +86,6 @@ app.post('/api/diarios', (req, res) => {
       return res.status(400).json({ error: 'Obra, responsável e data são obrigatórios.' });
     }
 
-    // trava de intercorrência (já que o front faz, reforçamos aqui)
     const intercorrencias = Array.isArray(payload.intercorrencias) ? payload.intercorrencias : [];
     const temInterValida = intercorrencias.some(i => i.codigo || i.descricao);
     if (!temInterValida) {
@@ -106,7 +112,7 @@ app.post('/api/diarios', (req, res) => {
   }
 });
 
-// listar diários (simples, sem filtro complexo)
+// listar diários
 app.get('/api/diarios', (req, res) => {
   try {
     const db = carregarDiarios();
@@ -242,7 +248,6 @@ function normaliza(str) {
 }
 
 // GET /api/funcionarios?q=...
-// usado para autocomplete da chapa
 app.get('/api/funcionarios', (req, res) => {
   const q = (req.query.q || '').toString().trim();
 
@@ -266,7 +271,6 @@ app.get('/api/funcionarios', (req, res) => {
 });
 
 // GET /api/funcionarios/:chapa
-// usado quando o usuário escolhe uma chapa específica
 app.get('/api/funcionarios/:chapa', (req, res) => {
   const chapaParam = req.params.chapa.toString().trim();
 
@@ -283,7 +287,7 @@ app.get('/api/funcionarios/:chapa', (req, res) => {
   res.json(f);
 });
 
-// ===== HEALTHCHECK BÁSICO =====
+// ===== HEALTHCHECK =====
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', funcionarios: funcionarios.length });
 });
