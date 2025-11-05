@@ -11,8 +11,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =================== ARQUIVOS ESTÁTICOS / HTML ===================
-// Todos os HTML (index.html, form.html, login.html, viewer.html) devem estar
-// na MESMA PASTA que este server.js
+
 const PUBLIC_DIR = __dirname;
 
 // Servir arquivos estáticos (HTML, CSS, JS, imagens)
@@ -56,8 +55,8 @@ function salvarDiarios(db) {
 // =================== LOGIN SIMPLES ===================
 const USERS = [
   { username: 'engenheiro', password: '123', role: 'engenheiro' },
-  { username: 'mestre', password: '123', role: 'mestre' },
-  { username: 'adm', password: '123', role: 'admin' }
+  { username: 'mestre',     password: '123', role: 'mestre'     },
+  { username: 'adm',        password: '123', role: 'admin'      }
 ];
 
 app.post('/api/login', (req, res) => {
@@ -208,59 +207,23 @@ function carregarFuncionarios() {
   }
 }
 
-// Padroniza um funcionário: { chapa, nome, funcao }
+// >>>>>>> FUNÇÃO CRÍTICA: usa APENAS "chapa", "nome", "funcao" <<<<<<<
 function mapFuncionario(row) {
-  const keys = Object.keys(row);
-
-  let chapa =
-    row.chapa ||
-    row.CHAPA ||
-    row.Chapa ||
-    row['chapa'] ||
-    row['CHAPA'] ||
-    row['Chapa'];
-
-  let nome = row.nome || row.NOME || row.Nome;
-  let funcao =
-    row.funcao ||
-    row.FUNCAO ||
-    row.Funcao ||
-    row['FUNÇÃO'] ||
-    row['Função'];
-
-  // tenta achar chave que contenha "nome"
-  if (!nome) {
-    for (const k of keys) {
-      if (k.toLowerCase().includes('nome')) {
-        nome = row[k];
-        break;
-      }
-    }
-  }
-
-  // tenta achar chave que contenha "func"
-  if (!funcao) {
-    for (const k of keys) {
-      if (k.toLowerCase().includes('func')) {
-        funcao = row[k];
-        break;
-      }
-    }
-  }
-
-  // fallback bruto: 1ª = chapa, 2ª = nome, 3ª = função
-  if (!chapa && keys[0]) chapa = row[keys[0]];
-  if (!nome && keys[1]) nome = row[keys[1]];
-  if (!funcao && keys[2]) funcao = row[keys[2]];
+  const chapa =
+    row.chapa || row.CHAPA || row.Chapa || '';
+  const nome =
+    row.nome  || row.NOME  || row.Nome  || '';
+  const funcao =
+    row.funcao || row.FUNCAO || row.Funcao || '';
 
   return {
-    chapa: chapa ? String(chapa).trim() : '',
-    nome: nome ? String(nome).trim() : '',
-    funcao: funcao ? String(funcao).trim() : ''
+    chapa: String(chapa).trim(),
+    nome:  String(nome).trim(),
+    funcao: String(funcao).trim()
   };
 }
 
-// GET /api/funcionarios?q=...  (autocomplete de chapa)
+// GET /api/funcionarios?q=...  (autocomplete de chapa ou nome)
 app.get('/api/funcionarios', (req, res) => {
   const q = (req.query.q || '').toString().trim();
 
