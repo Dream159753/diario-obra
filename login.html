@@ -3,464 +3,160 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Diário de Obra</title>
+<title>Login - Diário de Obra</title>
 <style>
-  :root { --prim:#3A6385; --muted:#66758a; --ok:#1b8a5a; --warn:#c0392b; }
+  :root { --prim:#3A6385; --muted:#66758a; --bg:#f4f6f9; }
   *{ box-sizing:border-box; }
-  body{ font-family: Arial, sans-serif; background:#f4f6f9; padding:24px; color:#233; }
-  h2{ text-align:center; color:#333; margin:0 0 16px; }
-  .section{
-    background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08);
-    overflow:hidden; margin-bottom:18px;
+  body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    color:#233;
   }
-  .section h3{
-    margin:0; padding:12px 16px; background:#f9fbfd; border-bottom:1px solid #eef2f6;
-    color:#333; display:flex; justify-content:space-between; align-items:center; font-size:16px;
+  .card{
+    background:#fff;
+    padding:24px 24px 20px;
+    border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+    width:100%;
+    max-width:360px;
   }
-  .bar{
-    display:flex; gap:12px; align-items:center; justify-content:space-between;
-    padding:12px 16px; background:#f9fbfd; border-bottom:1px solid #eef2f6;
+  h1{
+    margin:0 0 4px;
+    font-size:22px;
+    text-align:center;
+    color:#333;
   }
-  .meta{ font-size:13px; color:var(--muted); }
-  table{ width:100%; border-collapse:collapse; }
-  thead th{ background:var(--prim); color:#fff; position:sticky; top:0; z-index:1; }
-  th,td{ border:1px solid #e6e6e6; padding:10px 8px; text-align:center; font-size:14px; }
-  td.fun{ text-align:left; font-weight:600; color:#333; }
-
-  input[type="number"]{
-    width:72px; max-width:90px; padding:6px 8px;
-    border:1px solid #cfd6df; border-radius:6px; text-align:center; font-size:14px; outline:none;
-    display:inline-block;
+  .subtitle{
+    margin:0 0 20px;
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
   }
-  input[type="text"], select, textarea{
-    width:100%; max-width:100%;
-    padding:6px 8px; border:1px solid #cfd6df; border-radius:6px; font-size:14px; outline:none;
+  label{
+    display:block;
+    font-size:13px;
+    margin-bottom:4px;
+    color:#444;
   }
-  input[type="text"][data-kind="codigo"]{ text-align:center; }
-  textarea{ resize:vertical; min-height:42px; text-align:left; }
-  input:focus, select:focus, textarea:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
-  .total-funcao, #totalGeral{ font-weight:700; color:var(--prim); }
-  tfoot th{ background:#f5f9ff; font-size:15px; }
-  .btn{ padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
+  input[type="text"],
+  input[type="password"]{
+    width:100%;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #cfd6df;
+    font-size:14px;
+    outline:none;
+  }
+  input:focus{
+    border-color:var(--prim);
+    box-shadow:0 0 0 3px rgba(58,99,133,.12);
+  }
+  .field{ margin-bottom:14px; }
+  .btn{
+    width:100%;
+    padding:10px 14px;
+    border:none;
+    border-radius:8px;
+    background:var(--prim);
+    color:#fff;
+    font-size:15px;
+    cursor:pointer;
+  }
   .btn:hover{ filter:brightness(.95); }
-  .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
-  .btn-ghost{ padding:10px 18px; background:#eef2f6; color:#333; border-radius:8px; border:0; cursor:pointer; font-size:15px; }
-  .btn-ghost:hover{ filter:brightness(.97); }
-  .del{ background:#e74c3c; color:#fff; }
-  .del:hover{ filter:brightness(.95); }
-  .foot-actions{ padding:16px; text-align:center; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-  .pill{ font-size:12px; padding:6px 10px; border-radius:999px; background:#eef2f6; color:#333; }
-  .pill.ok{ background:#eaf7f0; color:var(--ok); border:1px solid #cdeedd; }
-  .pill.warn{ background:#fdecea; color:var(--warn); border:1px solid #f7c6c1; }
-  .catalog{ display:none; padding:0 16px 16px; }
-  .catalog table th, .catalog table td{ font-size:13px; text-align:left; }
+  .msg{
+    margin-top:10px;
+    font-size:13px;
+    text-align:center;
+    min-height:18px;
+  }
+  .msg.err{ color:#c0392b; }
+  .msg.ok{ color:#1b8a5a; }
+  .footer{
+    margin-top:16px;
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+  }
 </style>
 </head>
 <body>
-<h2>📒 Diário de Obra</h2>
+<div class="card">
+  <h1>Diário de Obra</h1>
+  <p class="subtitle">Acesse para visualizar os diários lançados</p>
 
-<form id="diarioForm" autocomplete="off">
-  <!-- IDENTIFICAÇÃO -->
-  <div class="section" id="sec-identificacao">
-    <h3>Identificação do Diário</h3>
-    <table>
-      <tr><th style="width:30%">Obra</th><td><input type="text" name="obra" placeholder="Nome da obra" required></td></tr>
-      <tr><th>Responsável pelo preenchimento</th><td><input type="text" name="responsavel" placeholder="Seu nome completo" required></td></tr>
-      <tr><th>Data</th><td><input type="date" name="data" required></td></tr>
-    </table>
-    <div class="bar">
-      <div class="meta"><strong>Dica:</strong> preencha a identificação antes de registrar as presenças.</div>
-      <button type="button" class="btn-ghost" id="limpar">Zerar Tudo</button>
+  <form id="loginForm" autocomplete="off">
+    <div class="field">
+      <label for="usuario">Usuário</label>
+      <input type="text" id="usuario" name="usuario" required placeholder="Digite o usuário">
     </div>
-  </div>
-
-  <!-- FUNÇÕES -->
-  <div class="section" id="sec-funcoes">
-    <h3>Equipe por Função (Presente / Ausente / Férias / Total)</h3>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:38%">Função</th>
-          <th style="width:15%">Presente</th>
-          <th style="width:15%">Ausente</th>
-          <th style="width:15%">Férias</th>
-          <th style="width:17%">Total</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <!-- (todas as funções) -->
-        <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO DE PROTEÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO SERRA E CAIXINHA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR ENROLANDO ARAME</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE ELEVAÇÃO ESTRUTURAL</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO MARCAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CHAPISCO + TIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO ALVENARIA VEDAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO MASSA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CONTRA PISO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CHUMBAMENTO PCF</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ GESSO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CONTRA MARCO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO REGULARIZAÇÃO DE ESCADA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO POÇO DO ELEVADOR E PRESSURIZAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE ARREMATE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">REJUNTADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SERVENTE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SINALEIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SOLDADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">TEC. DE SEGURANÇA DO TRABALHO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-      </tbody>
-      <tfoot><tr><th colspan="4">TOTAL GERAL</th><th id="totalGeral">0</th></tr></tfoot>
-    </table>
-  </div>
-
-  <!-- AUSENTES -->
-  <div class="section" id="sec-ausentes">
-    <h3>Identificação dos Ausentes <span id="badgeResumo" class="pill">Listados: 0 • Informados: 0</span></h3>
-    <table id="tblAusentes">
-      <thead><tr><th style="width:20%">Chapa</th><th style="width:40%">Nome</th><th style="width:30%">Função</th><th style="width:10%"></th></tr></thead>
-      <tbody id="tbodyAusentes"></tbody>
-      <tfoot><tr><td colspan="4" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addAusente">+ Adicionar ausente</button></td></tr></tfoot>
-    </table>
-  </div>
-
-  <!-- INTERCORRÊNCIAS -->
-  <div class="section" id="sec-inter">
-    <h3>Intercorrências (fatores que atrapalharam a produção) <span id="badgeInter" class="pill">Itens: 0 • Duplicados: 0</span></h3>
-    <div class="bar" style="border-top:1px solid #eef2f6;">
-      <div class="meta">Use um <strong>código numérico</strong> e descreva o ocorrido. Ex.: <em>15 — grua quebrada das 07:00 às 16:00</em></div>
-      <div>
-        <button type="button" class="btn btn-sm btn-ghost" id="toggleCatalogo">📖 Ver catálogo de códigos</button>
-        <button type="button" class="btn btn-sm" id="addInter">+ Adicionar intercorrência</button>
-      </div>
+    <div class="field">
+      <label for="senha">Senha</label>
+      <input type="password" id="senha" name="senha" required placeholder="Digite a senha">
     </div>
-    <div class="catalog" id="catalogo">
-      <table>
-        <thead><tr><th style="width:12%">Código</th><th>Título</th><th>Modelo de descrição</th></tr></thead>
-        <tbody id="catalogoBody"></tbody>
-      </table>
-    </div>
-    <table id="tblInter">
-      <thead><tr><th style="width:18%">Código</th><th>Descrição</th><th style="width:12%"></th></tr></thead>
-      <tbody id="tbodyInter"></tbody>
-      <tfoot><tr><td colspan="3" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addInter2">+ Adicionar intercorrência</button></td></tr></tfoot>
-    </table>
-    <datalist id="listaCodigos"></datalist>
-  </div>
+    <button type="submit" class="btn">Entrar</button>
+  </form>
 
-  <!-- OBSERVAÇÕES -->
-  <div class="section" id="sec-observacoes">
-    <h3>Observações / Serviços em Execução</h3>
-    <div style="padding:16px;">
-      <textarea name="observacoes" placeholder="Descreva aqui os serviços executados hoje..." rows="5" style="width:100%;"></textarea>
-    </div>
-  </div>
+  <div id="msg" class="msg"></div>
 
-  <!-- BOTÕES FINAIS -->
-  <div class="foot-actions">
-    <button type="submit" class="btn">Salvar Diário</button>
-    <button type="button" class="btn-ghost" id="btnPdf">Salvar em PDF</button>
+  <div class="footer">
+    Após logar, você será redirecionado para a tela de consulta (viewer).
   </div>
-</form>
+</div>
 
 <script>
-/* ====== CONFIG API ====== */
-// Usa localhost quando está em localhost, senão usa mesma origem (Render)
-const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? 'http://localhost:3000'
-  : '';
+  // MESMA ORIGEM DO SERVIDOR (Render ou local)
+  const API = '';
 
-/* Catálogo (removidos: 13,14,17,21,23,24,27,29) */
-const CATALOG = [
-  {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
-  {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
-  {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
-  {code:15, title:'Grua quebrada', model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
-  {code:16, title:'Interdição de área', model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
-  {code:18, title:'Acidente/ocorrência', model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
-  {code:19, title:'Fiscalização/Paralisação', model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
-  {code:20, title:'Dúvida técnica/Projeto', model:'Dúvida técnica de projeto (item) — aguardando definição.'},
-  {code:22, title:'Falta de água', model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
-  {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
-  {code:26, title:'Vistoria externa', model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
-];
+  const form = document.getElementById('loginForm');
+  const msg  = document.getElementById('msg');
 
-const FUNCOES = [
-  "ADMINISTRATIVO","MESTRE","ENCARREGADO","CARPINTEIRO TORRE","CARPINTEIRO PERIFERIA",
-  "CARPINTEIRO DE PROTEÇÃO","CARPINTEIRO SERRA E CAIXINHA","ARMADOR TORRE","ARMADOR PERIFERIA",
-  "ARMADOR ENROLANDO ARAME","PEDREIRO DE ELEVAÇÃO ESTRUTURAL","PEDREIRO MARCAÇÃO",
-  "PEDREIRO CHAPISCO + TIRO","PEDREIRO ALVENARIA VEDAÇÃO","PEDREIRO MASSA","PEDREIRO CONTRA PISO",
-  "PEDREIRO CHUMBAMENTO PCF","PEDREIRO DE REGULARIZAÇÃO P/ GESSO","PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA",
-  "PEDREIRO CONTRA MARCO","PEDREIRO REGULARIZAÇÃO DE ESCADA",
-  "PEDREIRO DE REGULARIZAÇÃO POÇO DO ELEVADOR E PRESSURIZAÇÃO",
-  "PEDREIRO DE ARREMATE","REJUNTADOR","SERVENTE","SINALEIRO","SOLDADOR","TEC. DE SEGURANÇA DO TRABALHO"
-];
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    msg.textContent = '';
+    msg.className = 'msg';
 
-const toInt = v => parseInt(v,10)||0;
+    const usuario = document.getElementById('usuario').value.trim();
+    const senha   = document.getElementById('senha').value.trim();
 
-/* ======= SOMATÓRIOS ======= */
-function atualizarLinha(tr){
-  const pre = toInt(tr.querySelector('input[data-tipo="presente"]').value);
-  const aus = toInt(tr.querySelector('input[data-tipo="ausente"]').value);
-  const fer = toInt(tr.querySelector('input[data-tipo="ferias"]').value);
-  tr.querySelector('.total-funcao').textContent = pre + aus + fer;
-}
-function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEach(td=>s+=toInt(td.textContent)); return s; }
-function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
-function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
+    if(!usuario || !senha){
+      msg.textContent = 'Preencha usuário e senha.';
+      msg.classList.add('err');
+      return;
+    }
 
-/* ======= AUSENTES (com autocomplete por chapa) ======= */
-function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
-
-function wireChapaAutocomplete(tr){
-  const inputChapa = tr.querySelector('[name="aus_chapa"]');
-  const inputNome  = tr.querySelector('[name="aus_nome"]');
-  const selectFunc = tr.querySelector('[name="aus_funcao"]');
-  const dl         = tr.querySelector('datalist');
-
-  // Quando sai do campo, busca 1 funcionário pela chapa
-  inputChapa.addEventListener('blur', async ()=>{
-    const chapa = inputChapa.value.trim();
-    if(!chapa) return;
     try{
-      const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
-      if(r.ok){
-        const f = await r.json();
-        // nome sempre vem do CSV
-        inputNome.value = f.nome || '';
+      const resp = await fetch(`${API}/api/login`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ usuario, senha })
+      });
+      const data = await resp.json().catch(()=>({}));
 
-        // >>> AQUI ESTÁ O AJUSTE DA FUNÇÃO <<<
-        if(f.funcao){
-          // tenta achar uma opção existente com exatamente esse value
-          let opt = Array.from(selectFunc.options).find(o => o.value === f.funcao);
-          // se não existir, cria uma nova opção com esse texto
-          if(!opt){
-            opt = new Option(f.funcao, f.funcao);
-            selectFunc.add(opt);
-          }
-          selectFunc.value = f.funcao;
-        }
+      if(!resp.ok){
+        msg.textContent = data.error || 'Usuário ou senha inválidos.';
+        msg.classList.add('err');
+        return;
       }
-    }catch(e){
-      console.error('Erro ao buscar funcionário pela chapa:', e);
+
+      msg.textContent = 'Login realizado com sucesso. Redirecionando...';
+      msg.classList.add('ok');
+
+      // Se no futuro tiver token, pode salvar aqui (localStorage etc.)
+      setTimeout(()=>{
+        window.location.href = 'viewer.html';
+      }, 600);
+
+    }catch(err){
+      console.error(err);
+      msg.textContent = 'Não foi possível conectar ao servidor.';
+      msg.classList.add('err');
     }
   });
-
-  // Autocomplete de chapas
-  let autocompTimer=null;
-  inputChapa.addEventListener('input', ()=>{
-    const term = inputChapa.value.trim();
-    if(autocompTimer) clearTimeout(autocompTimer);
-    autocompTimer = setTimeout(async ()=>{
-      if(!term){ dl.innerHTML=''; return; }
-      try{
-        const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
-        const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista.map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`).join('');
-      }catch(err){
-        console.error('Erro no autocomplete de funcionários:', err);
-        dl.innerHTML='';
-      }
-    },200);
-  });
-}
-
-function novaLinhaAusente(){
-  const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
-  tr.innerHTML=`
-    <td>
-      <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
-      <datalist id="${uid}"></datalist>
-    </td>
-    <td><input type="text" name="aus_nome"  placeholder="Nome completo" /></td>
-    <td><select name="aus_funcao"><option value="" disabled selected>Selecione...</option>${optFuncoesHTML()}</select></td>
-    <td><button type="button" class="btn btn-sm del">Remover</button></td>`;
-  wireChapaAutocomplete(tr);
-  return tr;
-}
-function contarAusentesListados(){
-  let n=0;
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
-    const c=tr.querySelector('[name="aus_chapa"]').value.trim();
-    const nm=tr.querySelector('[name="aus_nome"]').value.trim();
-    const fu=tr.querySelector('[name="aus_funcao"]').value;
-    if(c||nm||fu) n++;
-  });
-  return n;
-}
-function atualizarBadgeAusentes(){
-  const list=contarAusentesListados(), inf=totalAusentesInformados();
-  const b=document.getElementById('badgeResumo');
-  b.textContent=`Listados: ${list} • Informados: ${inf}`;
-  b.className='pill '+(list===inf?'ok':'warn');
-  b.title=list===inf?'Quantidade confere.':'Atenção: diferença entre listados e informados.';
-}
-
-/* ======= INTERCORRÊNCIAS ======= */
-const dlInter=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
-function renderCatalogo(){
-  dlInter.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
-  catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
-}
-function novaLinhaInter(cod="",desc=""){
-  const tr=document.createElement('tr');
-  tr.innerHTML=`
-    <td><input type="text" name="inter_codigo" data-kind="codigo" inputmode="numeric" pattern="\\d+" list="listaCodigos" placeholder="Ex: 15" value="${cod}"></td>
-    <td><textarea name="inter_desc" placeholder="Ex.: grua quebrada das 07:00 às 16:00">${desc}</textarea></td>
-    <td><button type="button" class="btn btn-sm del">Remover</button></td>`;
-  return tr;
-}
-function contarInter(){ return document.querySelectorAll('#tbodyInter tr').length; }
-function contarDuplicadosCodigo(){
-  const map=new Map(); let dup=0;
-  document.querySelectorAll('#tbodyInter [name="inter_codigo"]').forEach(inp=>{
-    const v=inp.value.trim(); if(!v) return; map.set(v,(map.get(v)||0)+1);
-  });
-  map.forEach(v=>{ if(v>1) dup++; });
-  return dup;
-}
-function atualizarBadgeInter(){
-  const itens=contarInter(), dups=contarDuplicadosCodigo();
-  const b=document.getElementById('badgeInter');
-  b.textContent=`Itens: ${itens} • Duplicados: ${dups}`;
-  b.className='pill '+(dups===0?'ok':'warn');
-  b.title=dups===0?'Sem códigos duplicados.':'Existem códigos duplicados.';
-}
-function autoDescricaoPorCodigo(inputCodigo){
-  const tr=inputCodigo.closest('tr');
-  const desc=tr.querySelector('[name="inter_desc"]');
-  const val=inputCodigo.value.trim();
-  if(!val) return;
-  const item=CATALOG.find(c=>String(c.code)===val);
-  if(item && (!desc.value || desc.value.trim()==="")) desc.value=`${item.title} — ${item.model}`;
-}
-
-/* ======= EVENTOS ======= */
-document.getElementById('tbody').addEventListener('input', e=>{
-  if(e.target.matches('input[type="number"]')){
-    atualizarLinha(e.target.closest('tr')); renderTotalGeral(); atualizarBadgeAusentes();
-  }
-});
-document.getElementById('limpar').addEventListener('click', ()=>{
-  document.querySelectorAll('#diarioForm input[type="number"]').forEach(i=>i.value=0);
-  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
-  renderTotalGeral();
-  document.querySelector('[name="obra"]').value='';
-  document.querySelector('[name="responsavel"]').value='';
-  document.querySelector('[name="data"]').value='';
-  document.querySelector('[name="observacoes"]').value='';
-  document.getElementById('tbodyAusentes').innerHTML='';
-  document.getElementById('tbodyInter').innerHTML='';
-  atualizarBadgeAusentes(); atualizarBadgeInter();
-});
-document.getElementById('addAusente').addEventListener('click', ()=>{
-  document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente()); atualizarBadgeAusentes();
-});
-document.getElementById('tbodyAusentes').addEventListener('click', e=>{
-  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeAusentes(); }
-});
-document.getElementById('tbodyAusentes').addEventListener('input', atualizarBadgeAusentes);
-document.getElementById('tbodyAusentes').addEventListener('change', atualizarBadgeAusentes);
-
-document.getElementById('addInter').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
-});
-document.getElementById('addInter2').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
-});
-document.getElementById('tbodyInter').addEventListener('click', e=>{
-  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeInter(); }
-});
-document.getElementById('tbodyInter').addEventListener('input', e=>{
-  if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
-  if(e.target.name==='inter_desc'){ atualizarBadgeInter(); }
-});
-document.getElementById('tbodyInter').addEventListener('change', e=>{
-  if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
-});
-
-document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
-  const cat = document.getElementById('catalogo');
-  cat.style.display = cat.style.display === 'none' || !cat.style.display ? 'block' : 'none';
-});
-
-window.addEventListener('DOMContentLoaded', ()=>{
-  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
-  renderTotalGeral(); atualizarBadgeAusentes();
-  renderCatalogo(); atualizarBadgeInter();
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr => wireChapaAutocomplete(tr));
-});
-
-/* ======= INTEGRAÇÃO COM O BACKEND ======= */
-function coletarPayload(){
-  const obra        = document.querySelector('[name="obra"]').value.trim();
-  const responsavel = document.querySelector('[name="responsavel"]').value.trim();
-  const data        = document.querySelector('[name="data"]').value;
-  const observacoes = document.querySelector('[name="observacoes"]').value.trim();
-
-  const funcoes=[]; document.querySelectorAll('#tbody tr').forEach(tr=>{
-    funcoes.push({
-      funcao: tr.querySelector('.fun').textContent.trim(),
-      presente: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
-      ausente:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
-      ferias:   parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
-    });
-  });
-  const ausentes=[]; document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
-    ausentes.push({
-      chapa: tr.querySelector('[name="aus_chapa"]').value.trim(),
-      nome: tr.querySelector('[name="aus_nome"]').value.trim(),
-      funcao: tr.querySelector('[name="aus_funcao"]').value
-    });
-  });
-  const intercorrencias=[]; document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
-    intercorrencias.push({
-      codigo: tr.querySelector('[name="inter_codigo"]').value.trim(),
-      descricao: tr.querySelector('[name="inter_desc"]').value.trim()
-    });
-  });
-
-  return { obra, responsavel, data, observacoes, funcoes, ausentes, intercorrencias };
-}
-
-document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const payload = coletarPayload();
-
-  // trava de intercorrência obrigatória (pelo menos uma com código ou descrição)
-  const temInterValida = (payload.intercorrencias||[]).some(i => i.codigo || i.descricao);
-  if(!temInterValida){
-    alert('Preencha pelo menos uma intercorrência antes de salvar o diário.');
-    return;
-  }
-
-  try{
-    const resp = await fetch(`${API}/api/diarios`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-    });
-    const json = await resp.json();
-    if(!resp.ok){ alert('Erro: '+(json.error||'Falha ao salvar')); return; }
-    alert('Diário salvo com ID #'+json.id);
-  }catch(err){
-    console.error(err);
-    alert('Não foi possível conectar ao servidor.');
-  }
-});
-
-/* ======= PDF SIMPLES (imprimir página) ======= */
-document.getElementById('btnPdf').addEventListener('click', ()=>{
-  window.print();
-});
 </script>
 </body>
 </html>
