@@ -44,7 +44,7 @@
   .btn{ padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
   .btn:hover{ filter:brightness(.95); }
   .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
-  .btn-ghost{ background:#eef2f6; color:#333; }
+  .btn-ghost{ padding:10px 18px; background:#eef2f6; color:#333; border-radius:8px; border:0; cursor:pointer; font-size:15px; }
   .del{ background:#e74c3c; color:#fff; }
   .del:hover{ filter:brightness(.95); }
   .foot-actions{ padding:16px; text-align:center; display:flex; gap:12px; justify-content:center; }
@@ -172,7 +172,8 @@
 
 <script>
 /* ====== CONFIG API ====== */
-const API = 'http://localhost:3000';
+// usa o mesmo domínio da página (funciona local e no Render)
+const API = window.location.origin;
 
 /* Catálogo (removidos: 13,14,17,21,23,24,27,29) */
 const CATALOG = [
@@ -254,7 +255,9 @@ function wireChapaAutocomplete(tr){
       try{
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
         const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista.map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`).join('');
+        dl.innerHTML = lista.map(p =>
+          `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`
+        ).join('');
       }catch{
         dl.innerHTML='';
       }
@@ -294,9 +297,9 @@ function atualizarBadgeAusentes(){
 }
 
 /* ======= INTERCORRÊNCIAS ======= */
-const dl=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
+const dlInter=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
 function renderCatalogo(){
-  dl.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
+  dlInter.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
   catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
 }
 function novaLinhaInter(cod="",desc=""){
