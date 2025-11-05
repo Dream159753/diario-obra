@@ -109,7 +109,7 @@
 </div>
 
 <script>
-  // MESMA ORIGEM DO SERVIDOR (Render ou local)
+  // mesma origem do backend (Render ou local)
   const API = '';
 
   const form = document.getElementById('loginForm');
@@ -124,7 +124,7 @@
     const senha   = document.getElementById('senha').value.trim();
 
     if(!usuario || !senha){
-      msg.textContent = 'Preencha usuário e senha.';
+      msg.textContent = 'Usuário e senha são obrigatórios.';
       msg.classList.add('err');
       return;
     }
@@ -133,7 +133,8 @@
       const resp = await fetch(`${API}/api/login`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ usuario, senha })
+        // AQUI A CORREÇÃO: backend espera "email"
+        body: JSON.stringify({ email: usuario, senha })
       });
       const data = await resp.json().catch(()=>({}));
 
@@ -146,7 +147,6 @@
       msg.textContent = 'Login realizado com sucesso. Redirecionando...';
       msg.classList.add('ok');
 
-      // Se no futuro tiver token, pode salvar aqui (localStorage etc.)
       setTimeout(()=>{
         window.location.href = 'viewer.html';
       }, 600);
