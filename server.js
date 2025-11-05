@@ -93,7 +93,7 @@ app.post('/api/diarios', (req, res) => {
         .json({ error: 'Obra, responsável e data são obrigatórios.' });
     }
 
-    // Trava de intercorrência (mesma regra do front)
+    // Trava de intercorrência
     const intercorrencias = Array.isArray(payload.intercorrencias)
       ? payload.intercorrencias
       : [];
@@ -144,7 +144,7 @@ app.get('/api/diarios/:id', (req, res) => {
     const db = carregarDiarios();
     const diario = (db.itens || []).find(d => d.id === id);
     if (!diario) {
-      return res.status(404).json({ error: 'Diário não encontrado.' });
+      return res.status(404).json({ error: 'Diário não encontrado' });
     }
     res.json(diario);
   } catch (err) {
