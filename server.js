@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
-// =================== ARQUIVOS DE DADOS ===================
+// =================== ARQUIVOS DE DADOS (DIÁRIOS) ===================
 const DB_DIR = path.join(__dirname, 'data');
 const DIARIOS_FILE = path.join(DB_DIR, 'diarios.json');
 
@@ -153,23 +153,22 @@ app.get('/api/diarios/:id', (req, res) => {
 });
 
 // =================== FUNCIONÁRIOS / CSV ===================
+
+// Agora vamos ler os CSVs na RAIZ do projeto
+const FUNCIONARIOS_DIR = __dirname;
+
 const funcionarios = [];
 
-// Lê todos arquivos funcionarios*.csv na pasta /data
+// Lê todos arquivos funcionarios*.csv na RAIZ
 function carregarFuncionarios() {
   try {
-    if (!fs.existsSync(DB_DIR)) {
-      console.warn('Diretório data/ não existe, nenhum funcionário carregado.');
-      return;
-    }
-
     const arquivos = fs
-      .readdirSync(DB_DIR)
+      .readdirSync(FUNCIONARIOS_DIR)
       .filter(f => /^funcionarios.*\.csv$/i.test(f));
 
     if (!arquivos.length) {
       console.warn(
-        'Nenhum arquivo funcionarios*.csv encontrado na pasta /data.'
+        'Nenhum arquivo funcionarios*.csv encontrado na raiz do projeto.'
       );
       return;
     }
@@ -177,7 +176,7 @@ function carregarFuncionarios() {
     console.log('Arquivos de funcionários encontrados:', arquivos);
 
     arquivos.forEach(nomeArq => {
-      const caminho = path.join(DB_DIR, nomeArq);
+      const caminho = path.join(FUNCIONARIOS_DIR, nomeArq);
       const conteudo = fs.readFileSync(caminho, 'utf8');
 
       const linhas = conteudo
@@ -207,7 +206,7 @@ function carregarFuncionarios() {
   }
 }
 
-// >>>>>>> FUNÇÃO CRÍTICA: usa APENAS "chapa", "nome", "funcao" <<<<<<<
+// Usa apenas as colunas chapa / nome / funcao
 function mapFuncionario(row) {
   const chapa =
     row.chapa || row.CHAPA || row.Chapa || '';
