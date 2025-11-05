@@ -6,14 +6,24 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== MIDDLEWARE BÁSICO =====
+// =================== MIDDLEWARE BÁSICO ===================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// servir arquivos estáticos (index.html, login.html, form.html, viewer.html etc.)
-app.use(express.static(path.join(__dirname, 'public')));
+// =================== ARQUIVOS ESTÁTICOS / HTML ===================
+// Todos os HTML (index.html, form.html, login.html, viewer.html) devem estar
+// na MESMA PASTA que este server.js
+const PUBLIC_DIR = __dirname;
 
-// ===== ARQUIVO DE DIÁRIOS (JSON SIMPLES) =====
+// Servir arquivos estáticos (HTML, CSS, JS, imagens)
+app.use(express.static(PUBLIC_DIR));
+
+// Rota raiz -> index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
+// =================== ARQUIVOS DE DADOS ===================
 const DB_DIR = path.join(__dirname, 'data');
 const DIARIOS_FILE = path.join(DB_DIR, 'diarios.json');
 
@@ -23,7 +33,10 @@ if (!fs.existsSync(DB_DIR)) {
 
 function carregarDiarios() {
   if (!fs.existsSync(DIARIOS_FILE)) {
-    fs.writeFileSync(DIARIOS_FILE, JSON.stringify({ lastId: 0, itens: [] }, null, 2));
+    fs.writeFileSync(
+      DIARIOS_FILE,
+      JSON.stringify({ lastId: 0, itens: [] }, null, 2)
+    );
   }
   const conteudo = fs.readFileSync(DIARIOS_FILE, 'utf8');
   try {
@@ -40,7 +53,7 @@ function salvarDiarios(db) {
   fs.writeFileSync(DIARIOS_FILE, JSON.stringify(db, null, 2));
 }
 
-// ===== USUÁRIOS (LOGIN SIMPLES) =====
+// =================== LOGIN SIMPLES ===================
 const USERS = [
   { username: 'engenheiro', password: '123', role: 'engenheiro' },
   { username: 'mestre', password: '123', role: 'mestre' },
@@ -61,29 +74,36 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
   }
 
-  // retorno simples, sem token/jwt
   res.json({
     username: user.username,
     role: user.role
   });
 });
 
-// ===== ROTAS DE DIÁRIOS =====
+// =================== ROTAS DE DIÁRIOS ===================
 
-// salvar diário
+// Salvar diário
 app.post('/api/diarios', (req, res) => {
   try {
     const payload = req.body || {};
 
     if (!payload.obra || !payload.responsavel || !payload.data) {
-      return res.status(400).json({ error: 'Obra, responsável e data são obrigatórios.' });
+      return res
+        .status(400)
+        .json({ error: 'Obra, responsável e data são obrigatórios.' });
     }
 
-    // trava de intercorrência (já que o front faz, reforçamos aqui)
-    const intercorrencias = Array.isArray(payload.intercorrencias) ? payload.intercorrencias : [];
-    const temInterValida = intercorrencias.some(i => i.codigo || i.descricao);
+    // Trava de intercorrência (mesma regra do front)
+    const intercorrencias = Array.isArray(payload.intercorrencias)
+      ? payload.intercorrencias
+      : [];
+    const temInterValida = intercorrencias.some(
+      i => i.codigo || i.descricao
+    );
     if (!temInterValida) {
-      return res.status(400).json({ error: 'Preencha pelo menos uma intercorrência.' });
+      return res
+        .status(400)
+        .json({ error: 'Preencha pelo menos uma intercorrência.' });
     }
 
     const db = carregarDiarios();
@@ -106,7 +126,7 @@ app.post('/api/diarios', (req, res) => {
   }
 });
 
-// listar diários (simples, sem filtro complexo)
+// Listar diários
 app.get('/api/diarios', (req, res) => {
   try {
     const db = carregarDiarios();
@@ -117,7 +137,7 @@ app.get('/api/diarios', (req, res) => {
   }
 });
 
-// obter diário por ID
+// Obter diário por ID
 app.get('/api/diarios/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -133,10 +153,10 @@ app.get('/api/diarios/:id', (req, res) => {
   }
 });
 
-// ===== FUNCIONÁRIOS (CARREGAR CSVs) =====
+// =================== FUNCIONÁRIOS / CSV ===================
 const funcionarios = [];
 
-// lê todos arquivos funcionarios*.csv do diretório /data
+// Lê todos arquivos funcionarios*.csv na pasta /data
 function carregarFuncionarios() {
   try {
     if (!fs.existsSync(DB_DIR)) {
@@ -144,21 +164,26 @@ function carregarFuncionarios() {
       return;
     }
 
-    const arquivos = fs.readdirSync(DB_DIR)
+    const arquivos = fs
+      .readdirSync(DB_DIR)
       .filter(f => /^funcionarios.*\.csv$/i.test(f));
 
     if (!arquivos.length) {
-      console.warn('Nenhum arquivo funcionarios*.csv encontrado em /data.');
+      console.warn(
+        'Nenhum arquivo funcionarios*.csv encontrado na pasta /data.'
+      );
       return;
     }
 
     console.log('Arquivos de funcionários encontrados:', arquivos);
 
-    arquivos.forEach((nomeArq) => {
+    arquivos.forEach(nomeArq => {
       const caminho = path.join(DB_DIR, nomeArq);
       const conteudo = fs.readFileSync(caminho, 'utf8');
 
-      const linhas = conteudo.split(/\r?\n/).filter(l => l.trim() !== '');
+      const linhas = conteudo
+        .split(/\r?\n/)
+        .filter(l => l.trim() !== '');
       if (linhas.length < 2) return;
 
       const headerLine = linhas[0];
@@ -183,8 +208,10 @@ function carregarFuncionarios() {
   }
 }
 
-// função auxiliar para padronizar campos de funcionário
+// Padroniza um funcionário: { chapa, nome, funcao }
 function mapFuncionario(row) {
+  const keys = Object.keys(row);
+
   let chapa =
     row.chapa ||
     row.CHAPA ||
@@ -193,20 +220,7 @@ function mapFuncionario(row) {
     row['CHAPA'] ||
     row['Chapa'];
 
-  let nome =
-    row.nome ||
-    row.NOME ||
-    row.Nome;
-
-  if (!nome) {
-    for (const k in row) {
-      if (k.toLowerCase().includes('nome')) {
-        nome = row[k];
-        break;
-      }
-    }
-  }
-
+  let nome = row.nome || row.NOME || row.Nome;
   let funcao =
     row.funcao ||
     row.FUNCAO ||
@@ -214,14 +228,30 @@ function mapFuncionario(row) {
     row['FUNÇÃO'] ||
     row['Função'];
 
+  // tenta achar chave que contenha "nome"
+  if (!nome) {
+    for (const k of keys) {
+      if (k.toLowerCase().includes('nome')) {
+        nome = row[k];
+        break;
+      }
+    }
+  }
+
+  // tenta achar chave que contenha "func"
   if (!funcao) {
-    for (const k in row) {
+    for (const k of keys) {
       if (k.toLowerCase().includes('func')) {
         funcao = row[k];
         break;
       }
     }
   }
+
+  // fallback bruto: 1ª = chapa, 2ª = nome, 3ª = função
+  if (!chapa && keys[0]) chapa = row[keys[0]];
+  if (!nome && keys[1]) nome = row[keys[1]];
+  if (!funcao && keys[2]) funcao = row[keys[2]];
 
   return {
     chapa: chapa ? String(chapa).trim() : '',
@@ -230,31 +260,17 @@ function mapFuncionario(row) {
   };
 }
 
-// normaliza string pra comparar função ignorando acento, caixa e espaços
-function normaliza(str) {
-  return (str || '')
-    .toString()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
-
-// GET /api/funcionarios?q=...
-// usado para autocomplete da chapa
+// GET /api/funcionarios?q=...  (autocomplete de chapa)
 app.get('/api/funcionarios', (req, res) => {
   const q = (req.query.q || '').toString().trim();
 
   if (!q) {
-    return res.json(
-      funcionarios.slice(0, 50).map(mapFuncionario)
-    );
+    return res.json(funcionarios.slice(0, 50).map(mapFuncionario));
   }
 
   const termo = q.toLowerCase();
 
-  const filtrados = funcionarios.filter((row) => {
+  const filtrados = funcionarios.filter(row => {
     const f = mapFuncionario(row);
     return (
       f.chapa.toLowerCase().includes(termo) ||
@@ -265,12 +281,11 @@ app.get('/api/funcionarios', (req, res) => {
   res.json(filtrados.slice(0, 50).map(mapFuncionario));
 });
 
-// GET /api/funcionarios/:chapa
-// usado quando o usuário escolhe uma chapa específica
+// GET /api/funcionarios/:chapa  (preencher nome + função)
 app.get('/api/funcionarios/:chapa', (req, res) => {
   const chapaParam = req.params.chapa.toString().trim();
 
-  const row = funcionarios.find((r) => {
+  const row = funcionarios.find(r => {
     const f = mapFuncionario(r);
     return f.chapa === chapaParam;
   });
@@ -283,12 +298,12 @@ app.get('/api/funcionarios/:chapa', (req, res) => {
   res.json(f);
 });
 
-// ===== HEALTHCHECK BÁSICO =====
+// =================== HEALTHCHECK ===================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', funcionarios: funcionarios.length });
 });
 
-// ===== INICIAR SERVIDOR =====
+// =================== INICIAR SERVIDOR ===================
 carregarFuncionarios();
 
 app.listen(PORT, () => {
