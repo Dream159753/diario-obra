@@ -204,6 +204,17 @@ const FUNCOES = [
 
 const toInt = v => parseInt(v,10)||0;
 
+/* normalização pra comparar função ignorando acento, caixa, espaço extra */
+function normaliza(str){
+  return (str||'')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .toUpperCase();
+}
+
 /* ======= SOMATÓRIOS ======= */
 function atualizarLinha(tr){
   const pre = toInt(tr.querySelector('input[data-tipo="presente"]').value);
@@ -217,6 +228,7 @@ function renderTotalGeral(){ document.getElementById('totalGeral').textContent =
 
 /* ======= AUSENTES (com autocomplete por chapa) ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
+
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
   const inputNome  = tr.querySelector('[name="aus_nome"]');
@@ -231,10 +243,30 @@ function wireChapaAutocomplete(tr){
       const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
       if(r.ok){
         const f = await r.json();
-        inputNome.value = f.nome || '';
-        if(f.funcao){
-          const opt = Array.from(selectFunc.options).find(o=>o.value===f.funcao);
-          if(opt) selectFunc.value = f.funcao;
+
+        // nome: aceita várias formas de campo, só por garantia
+        inputNome.value = f.nome || f.NOME || f.nome_funcionario || '';
+
+        // função: tenta casar ignorando acento, caixa e espaço
+        const funcBruta = f.funcao || f.FUNCAO || '';
+        const alvoNorm  = normaliza(funcBruta);
+
+        const options = Array.from(selectFunc.options);
+        let chosen = options.find(o => normaliza(o.value) === alvoNorm);
+
+        if(!chosen && alvoNorm){
+          // tenta "contém" caso no CSV venha algo tipo "PEDREIRO MASSA / ARREMATE"
+          chosen = options.find(o => {
+            const optNorm = normaliza(o.value);
+            return optNorm && (optNorm.includes(alvoNorm) || alvoNorm.includes(optNorm));
+          });
+        }
+
+        if(chosen){
+          selectFunc.value = chosen.value;
+        }else{
+          // se não achar nada, pelo menos seleciona "Selecione..."
+          selectFunc.value = '';
         }
       }
     }catch(e){
@@ -242,7 +274,7 @@ function wireChapaAutocomplete(tr){
     }
   }
 
-  // antes tinha só blur; agora também change (seleção no datalist)
+  // quando sai do campo ou escolhe no datalist
   inputChapa.addEventListener('blur', buscarFuncionarioPorChapa);
   inputChapa.addEventListener('change', buscarFuncionarioPorChapa);
 
@@ -264,6 +296,7 @@ function wireChapaAutocomplete(tr){
     },200);
   });
 }
+
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
   const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
@@ -278,6 +311,7 @@ function novaLinhaAusente(){
   wireChapaAutocomplete(tr);
   return tr;
 }
+
 function contarAusentesListados(){
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
