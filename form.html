@@ -44,7 +44,7 @@
   .btn{ padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
   .btn:hover{ filter:brightness(.95); }
   .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
-  .btn-ghost{ padding:10px 18px; background:#eef2f6; color:#333; border-radius:8px; border:0; cursor:pointer; font-size:15px; }
+  .btn-ghost{ background:#eef2f6; color:#333; }
   .del{ background:#e74c3c; color:#fff; }
   .del:hover{ filter:brightness(.95); }
   .foot-actions{ padding:16px; text-align:center; display:flex; gap:12px; justify-content:center; }
@@ -53,6 +53,15 @@
   .pill.warn{ background:#fdecea; color:var(--warn); border:1px solid #f7c6c1; }
   .catalog{ display:none; padding:0 16px 16px; }
   .catalog table th, .catalog table td{ font-size:13px; text-align:left; }
+
+  /* Estética para impressão (igual salvar/imprimir do viewer) */
+  @media print {
+    body { background:#fff; padding:0; color:#000; }
+    .bar, .btn, .btn-sm, .btn-ghost, .del, .foot-actions { display:none !important; }
+    .section { box-shadow:none; margin-bottom:12px; }
+    thead th { background:#eeeeee !important; color:#000 !important;
+               -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
@@ -163,19 +172,20 @@
     </div>
   </div>
 
-  <!-- BOTÕES FINAIS -->
+  <!-- BOTÕES -->
   <div class="foot-actions">
     <button type="submit" class="btn">Salvar Diário</button>
-    <button type="button" class="btn btn-ghost" id="btnPdf">Salvar em PDF</button>
+    <button type="button" class="btn btn-ghost" id="salvarPDF">Salvar em PDF</button>
   </div>
 </form>
 
 <script>
 /* ====== CONFIG API ====== */
-const API = window.location.origin;
+const API = (location.hostname === 'localhost') ? 'http://localhost:3000' : '';
 
-/* Catálogo (removidos: 13,14,17,21,23,24,27,29) */
+/* Catálogo base (removidos anteriores: 13,14,17,21,23,24,27,29) + 1 novo código (30) */
 const CATALOG = [
+  {code:0, title:'Sem Intercorrência', model:'Não teve nenhuma intercorrência para atrapalhar a produção'},
   {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
   {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
   {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
@@ -187,7 +197,8 @@ const CATALOG = [
   {code:22, title:'Falta de água', model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
   {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
   {code:26, title:'Vistoria externa', model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
+  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'},
+  {code:30, title:'Parada técnica programada', model:'Parada técnica programada das HH:MM às HH:MM (sistema/equipamento: ...).'}
 ];
 
 const FUNCOES = [
@@ -203,17 +214,6 @@ const FUNCOES = [
 
 const toInt = v => parseInt(v,10)||0;
 
-/* normalização pra comparar função ignorando acento, caixa, espaço extra */
-function normaliza(str){
-  return (str||'')
-    .toString()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g,'')
-    .replace(/\s+/g,' ')
-    .trim()
-    .toUpperCase();
-}
-
 /* ======= SOMATÓRIOS ======= */
 function atualizarLinha(tr){
   const pre = toInt(tr.querySelector('input[data-tipo="presente"]').value);
@@ -225,71 +225,29 @@ function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEa
 function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
 function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
 
-/* ======= AUSENTES (com autocomplete por chapa) ======= */
+/* ======= AUSENTES (autocomplete por chapa) ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
-
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
   const inputNome  = tr.querySelector('[name="aus_nome"]');
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  async function buscarFuncionarioPorChapa(){
+  inputChapa.addEventListener('blur', async ()=>{
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
       const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
       if(r.ok){
         const f = await r.json();
-        console.log('Funcionario retornado:', f);
-
-        // pega nome em qualquer chave que contenha "nome"
-        let nomeVal = f.nome || f.NOME || f.Nome || f.nome_funcionario;
-        if(!nomeVal){
-          for(const k in f){
-            if(k.toLowerCase().includes('nome')){
-              nomeVal = f[k];
-              break;
-            }
-          }
-        }
-        inputNome.value = nomeVal || '';
-
-        // função: tenta casar ignorando acento, caixa e espaço
-        let funcVal = f.funcao || f.FUNCAO || f.Funcao;
-        if(!funcVal){
-          for(const k in f){
-            if(k.toLowerCase().includes('func')){
-              funcVal = f[k];
-              break;
-            }
-          }
-        }
-        const alvoNorm  = normaliza(funcVal);
-
-        const options = Array.from(selectFunc.options);
-        let chosen = options.find(o => normaliza(o.value) === alvoNorm);
-
-        if(!chosen && alvoNorm){
-          chosen = options.find(o => {
-            const optNorm = normaliza(o.value);
-            return optNorm && (optNorm.includes(alvoNorm) || alvoNorm.includes(optNorm));
-          });
-        }
-
-        if(chosen){
-          selectFunc.value = chosen.value;
-        }else{
-          selectFunc.value = '';
+        inputNome.value = f.nome || '';
+        if(f.funcao){
+          const opt = Array.from(selectFunc.options).find(o=>o.value===f.funcao);
+          if(opt) selectFunc.value = f.funcao;
         }
       }
-    }catch(e){
-      console.error('Erro ao buscar funcionário:', e);
-    }
-  }
-
-  inputChapa.addEventListener('blur', buscarFuncionarioPorChapa);
-  inputChapa.addEventListener('change', buscarFuncionarioPorChapa);
+    }catch{}
+  });
 
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
@@ -300,20 +258,14 @@ function wireChapaAutocomplete(tr){
       try{
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
         const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista.map(p =>{
-          const nomeSug = p.nome || p.NOME || p.Nome || p.nome_funcionario || '';
-          return `<option value="${p.chapa}" label="${nomeSug.replace(/"/g,'&quot;')}"></option>`;
-        }).join('');
-      }catch{
-        dl.innerHTML='';
-      }
+        dl.innerHTML = lista.map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`).join('');
+      }catch{ dl.innerHTML=''; }
     },200);
   });
 }
-
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8);
+  const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
   tr.innerHTML=`
     <td>
       <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
@@ -325,7 +277,6 @@ function novaLinhaAusente(){
   wireChapaAutocomplete(tr);
   return tr;
 }
-
 function contarAusentesListados(){
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
@@ -345,9 +296,10 @@ function atualizarBadgeAusentes(){
 }
 
 /* ======= INTERCORRÊNCIAS ======= */
-const dlInter=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
+const dlCodigos=document.getElementById('listaCodigos');
+const catBody=document.getElementById('catalogoBody');
 function renderCatalogo(){
-  dlInter.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
+  dlCodigos.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
   catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
 }
 function novaLinhaInter(cod="",desc=""){
@@ -359,6 +311,15 @@ function novaLinhaInter(cod="",desc=""){
   return tr;
 }
 function contarInter(){ return document.querySelectorAll('#tbodyInter tr').length; }
+function contarInterPreenchidasValidas(){
+  let n=0;
+  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
+    const c = tr.querySelector('[name="inter_codigo"]').value.trim();
+    const d = tr.querySelector('[name="inter_desc"]').value.trim();
+    if(c && d) n++;
+  });
+  return n;
+}
 function contarDuplicadosCodigo(){
   const map=new Map(); let dup=0;
   document.querySelectorAll('#tbodyInter [name="inter_codigo"]').forEach(inp=>{
@@ -410,6 +371,7 @@ document.getElementById('tbodyAusentes').addEventListener('click', e=>{
 document.getElementById('tbodyAusentes').addEventListener('input', atualizarBadgeAusentes);
 document.getElementById('tbodyAusentes').addEventListener('change', atualizarBadgeAusentes);
 
+/* Intercorrências */
 document.getElementById('addInter').addEventListener('click', ()=>{
   document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
 });
@@ -427,12 +389,15 @@ document.getElementById('tbodyInter').addEventListener('change', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
 });
 
-/* toggle catálogo */
+/* Toggle catálogo */
 document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
-  const cat = document.getElementById('catalogo');
-  cat.style.display = cat.style.display === 'block' ? 'none' : 'block';
+  const c = document.getElementById('catalogo');
+  const showing = c.style.display === 'block';
+  c.style.display = showing ? 'none' : 'block';
+  document.getElementById('toggleCatalogo').textContent = showing ? '📖 Ver catálogo de códigos' : '📘 Ocultar catálogo';
 });
 
+/* ======= INIT ======= */
 window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
   renderTotalGeral(); atualizarBadgeAusentes();
@@ -472,13 +437,45 @@ function coletarPayload(){
   return { obra, responsavel, data, observacoes, funcoes, ausentes, intercorrencias };
 }
 
+/* ======= SUBMIT + VALIDAÇÃO (inclui intercorrência obrigatória) ======= */
 document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
 
-  const temInterValida = payload.intercorrencias.some(i => i.codigo || i.descricao);
-  if(!temInterValida){
-    alert('Preencha pelo menos uma intercorrência antes de salvar o diário.');
+  if(!payload.obra || !payload.responsavel || !payload.data){
+    alert("⚠️ Preencha Obra, Responsável e Data antes de salvar.");
+    return;
+  }
+
+  const listados = contarAusentesListados();
+  const informados = totalAusentesInformados();
+  if(listados !== informados){
+    alert("⚠️ O número de ausentes listados não confere com o total informado na tabela de funções.");
+    return;
+  }
+
+  for(const tr of document.querySelectorAll('#tbodyAusentes tr')){
+    const c = tr.querySelector('[name=\"aus_chapa\"]').value.trim();
+    const n = tr.querySelector('[name=\"aus_nome\"]').value.trim();
+    const f = tr.querySelector('[name=\"aus_funcao\"]').value;
+    if((c||n||f) && (!c||!n||!f)){
+      alert("⚠️ Há linha de AUSENTE parcialmente preenchida. Complete chapa, nome e função.");
+      return;
+    }
+  }
+
+  for(const tr of document.querySelectorAll('#tbodyInter tr')){
+    const c = tr.querySelector('[name=\"inter_codigo\"]').value.trim();
+    const d = tr.querySelector('[name=\"inter_desc\"]').value.trim();
+    if((c||d) && (!c||!d)){
+      alert("⚠️ Há intercorrência parcialmente preenchida. Informe código e descrição.");
+      return;
+    }
+  }
+
+  /* TRAVA: Intercorrência obrigatória (pelo menos 1 válida) */
+  if(contarInterPreenchidasValidas() === 0){
+    alert("⚠️ Informe ao menos UMA intercorrência (código e descrição).");
     return;
   }
 
@@ -495,10 +492,11 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   }
 });
 
-/* ======= SALVAR EM PDF ======= */
-document.getElementById('btnPdf').addEventListener('click', ()=>{
-  window.print();
+/* ======= SALVAR EM PDF (mesma estética do viewer: usa diálogo de impressão) ======= */
+document.getElementById('salvarPDF').addEventListener('click', ()=>{
+  window.print(); // usuário seleciona "Salvar como PDF"
 });
 </script>
 </body>
 </html>
+
