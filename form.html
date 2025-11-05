@@ -53,15 +53,6 @@
   .pill.warn{ background:#fdecea; color:var(--warn); border:1px solid #f7c6c1; }
   .catalog{ display:none; padding:0 16px 16px; }
   .catalog table th, .catalog table td{ font-size:13px; text-align:left; }
-
-  /* Estética para impressão (igual salvar/imprimir do viewer) */
-  @media print {
-    body { background:#fff; padding:0; color:#000; }
-    .bar, .btn, .btn-sm, .btn-ghost, .del, .foot-actions { display:none !important; }
-    .section { box-shadow:none; margin-bottom:12px; }
-    thead th { background:#eeeeee !important; color:#000 !important;
-               -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
 </style>
 </head>
 <body>
@@ -172,20 +163,19 @@
     </div>
   </div>
 
-  <!-- BOTÕES -->
+  <!-- BOTÕES FINAIS -->
   <div class="foot-actions">
     <button type="submit" class="btn">Salvar Diário</button>
-    <button type="button" class="btn btn-ghost" id="salvarPDF">Salvar em PDF</button>
+    <button type="button" class="btn btn-ghost" id="btnPdf">Salvar em PDF</button>
   </div>
 </form>
 
 <script>
 /* ====== CONFIG API ====== */
-const API = (location.hostname === 'localhost') ? 'http://localhost:3000' : '';
+const API = 'http://localhost:3000';
 
-/* Catálogo base (removidos anteriores: 13,14,17,21,23,24,27,29) + 1 novo código (30) */
+/* Catálogo (removidos: 13,14,17,21,23,24,27,29) */
 const CATALOG = [
-  {code:0, title:'Sem Intercorrência', model:'Não teve nenhuma intercorrência para atrapalhar a produção'},
   {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
   {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
   {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
@@ -197,8 +187,7 @@ const CATALOG = [
   {code:22, title:'Falta de água', model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
   {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
   {code:26, title:'Vistoria externa', model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'},
-  {code:30, title:'Parada técnica programada', model:'Parada técnica programada das HH:MM às HH:MM (sistema/equipamento: ...).'}
+  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
 ];
 
 const FUNCOES = [
@@ -225,7 +214,7 @@ function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEa
 function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
 function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
 
-/* ======= AUSENTES (autocomplete por chapa) ======= */
+/* ======= AUSENTES (com autocomplete por chapa) ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
@@ -233,7 +222,8 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  inputChapa.addEventListener('blur', async ()=>{
+  // busca funcionário pela chapa (usado em blur + change)
+  async function buscarFuncionarioPorChapa(){
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
@@ -246,8 +236,14 @@ function wireChapaAutocomplete(tr){
           if(opt) selectFunc.value = f.funcao;
         }
       }
-    }catch{}
-  });
+    }catch(e){
+      console.error('Erro ao buscar funcionário:', e);
+    }
+  }
+
+  // antes tinha só blur; agora também change (seleção no datalist)
+  inputChapa.addEventListener('blur', buscarFuncionarioPorChapa);
+  inputChapa.addEventListener('change', buscarFuncionarioPorChapa);
 
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
@@ -259,7 +255,9 @@ function wireChapaAutocomplete(tr){
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
         const lista = r.ok ? await r.json() : [];
         dl.innerHTML = lista.map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`).join('');
-      }catch{ dl.innerHTML=''; }
+      }catch{
+        dl.innerHTML='';
+      }
     },200);
   });
 }
@@ -296,10 +294,9 @@ function atualizarBadgeAusentes(){
 }
 
 /* ======= INTERCORRÊNCIAS ======= */
-const dlCodigos=document.getElementById('listaCodigos');
-const catBody=document.getElementById('catalogoBody');
+const dl=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
 function renderCatalogo(){
-  dlCodigos.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
+  dl.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
   catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
 }
 function novaLinhaInter(cod="",desc=""){
@@ -311,15 +308,6 @@ function novaLinhaInter(cod="",desc=""){
   return tr;
 }
 function contarInter(){ return document.querySelectorAll('#tbodyInter tr').length; }
-function contarInterPreenchidasValidas(){
-  let n=0;
-  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
-    const c = tr.querySelector('[name="inter_codigo"]').value.trim();
-    const d = tr.querySelector('[name="inter_desc"]').value.trim();
-    if(c && d) n++;
-  });
-  return n;
-}
 function contarDuplicadosCodigo(){
   const map=new Map(); let dup=0;
   document.querySelectorAll('#tbodyInter [name="inter_codigo"]').forEach(inp=>{
@@ -371,7 +359,6 @@ document.getElementById('tbodyAusentes').addEventListener('click', e=>{
 document.getElementById('tbodyAusentes').addEventListener('input', atualizarBadgeAusentes);
 document.getElementById('tbodyAusentes').addEventListener('change', atualizarBadgeAusentes);
 
-/* Intercorrências */
 document.getElementById('addInter').addEventListener('click', ()=>{
   document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
 });
@@ -389,15 +376,12 @@ document.getElementById('tbodyInter').addEventListener('change', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
 });
 
-/* Toggle catálogo */
+/* toggle catálogo */
 document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
-  const c = document.getElementById('catalogo');
-  const showing = c.style.display === 'block';
-  c.style.display = showing ? 'none' : 'block';
-  document.getElementById('toggleCatalogo').textContent = showing ? '📖 Ver catálogo de códigos' : '📘 Ocultar catálogo';
+  const cat = document.getElementById('catalogo');
+  cat.style.display = cat.style.display === 'block' ? 'none' : 'block';
 });
 
-/* ======= INIT ======= */
 window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
   renderTotalGeral(); atualizarBadgeAusentes();
@@ -437,45 +421,14 @@ function coletarPayload(){
   return { obra, responsavel, data, observacoes, funcoes, ausentes, intercorrencias };
 }
 
-/* ======= SUBMIT + VALIDAÇÃO (inclui intercorrência obrigatória) ======= */
 document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
 
-  if(!payload.obra || !payload.responsavel || !payload.data){
-    alert("⚠️ Preencha Obra, Responsável e Data antes de salvar.");
-    return;
-  }
-
-  const listados = contarAusentesListados();
-  const informados = totalAusentesInformados();
-  if(listados !== informados){
-    alert("⚠️ O número de ausentes listados não confere com o total informado na tabela de funções.");
-    return;
-  }
-
-  for(const tr of document.querySelectorAll('#tbodyAusentes tr')){
-    const c = tr.querySelector('[name=\"aus_chapa\"]').value.trim();
-    const n = tr.querySelector('[name=\"aus_nome\"]').value.trim();
-    const f = tr.querySelector('[name=\"aus_funcao\"]').value;
-    if((c||n||f) && (!c||!n||!f)){
-      alert("⚠️ Há linha de AUSENTE parcialmente preenchida. Complete chapa, nome e função.");
-      return;
-    }
-  }
-
-  for(const tr of document.querySelectorAll('#tbodyInter tr')){
-    const c = tr.querySelector('[name=\"inter_codigo\"]').value.trim();
-    const d = tr.querySelector('[name=\"inter_desc\"]').value.trim();
-    if((c||d) && (!c||!d)){
-      alert("⚠️ Há intercorrência parcialmente preenchida. Informe código e descrição.");
-      return;
-    }
-  }
-
-  /* TRAVA: Intercorrência obrigatória (pelo menos 1 válida) */
-  if(contarInterPreenchidasValidas() === 0){
-    alert("⚠️ Informe ao menos UMA intercorrência (código e descrição).");
+  // trava básica para obrigar pelo menos 1 intercorrência preenchida
+  const temInterValida = payload.intercorrencias.some(i => i.codigo || i.descricao);
+  if(!temInterValida){
+    alert('Preencha pelo menos uma intercorrência antes de salvar o diário.');
     return;
   }
 
@@ -492,9 +445,9 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   }
 });
 
-/* ======= SALVAR EM PDF (mesma estética do viewer: usa diálogo de impressão) ======= */
-document.getElementById('salvarPDF').addEventListener('click', ()=>{
-  window.print(); // usuário seleciona "Salvar como PDF"
+/* ======= SALVAR EM PDF ======= */
+document.getElementById('btnPdf').addEventListener('click', ()=>{
+  window.print();
 });
 </script>
 </body>
