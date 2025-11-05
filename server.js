@@ -152,37 +152,48 @@ app.get('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
   res.json(list);
 });
 
-// POST /api/users — usado pelo admin.html para criar novo usuário
+// POST /api/users — cria novo usuário (usado pelo admin.html)
 app.post('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
-  let body = req.body || {};
+  const body = req.body || {};
 
-  // aceita vários nomes de campos vindos do front
+  // tenta descobrir email, senha e perfil por vários nomes de campo
   let email = (
-    body.email ||
-    body.usuario ||
-    body.user ||
-    body.login ||
+    body.email    ||
+    body.usuario  ||
+    body.user     ||
+    body.login    ||
     ''
   );
   let password = (
     body.password ||
-    body.senha ||
-    body.pass ||
-    body.novaSenha ||
+    body.senha    ||
+    body.pass     ||
+    body.novaSenha||
     ''
   );
   let role = body.role || body.perfil || 'user';
   let name = body.name || body.nome || '';
 
-  email = String(email).trim();
-  password = String(password).trim();
+  // fallback: se ainda não achou, pega os primeiros campos do body
+  const keys = Object.keys(body);
+  if (!email && keys.length > 0) {
+    email = body[keys[0]];
+  }
+  if (!password && keys.length > 1) {
+    password = body[keys[1]];
+  }
+  if (!role && keys.length > 2) {
+    role = body[keys[2]];
+  }
+
+  email = String(email || '').trim();
+  password = String(password || '').trim();
   role = String(role || 'user').trim();
 
   if (!email || !password){
     return res.status(400).json({ error:'Campos obrigatórios faltando' });
   }
 
-  // se não vier name, usa o pedaço antes do @
   if (!name || !String(name).trim()){
     name = email.includes('@') ? email.split('@')[0] : email;
   }
