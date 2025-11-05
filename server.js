@@ -1,331 +1,296 @@
-// server.js — Diário de Obra (auth + gestão de usuários)
+// server.js
 const express = require('express');
-const cors = require('cors');
-const Database = require('better-sqlite3');
-const session = require('express-session');
-const bcrypt = require('bcryptjs');
-const fs = require('fs');
 const path = require('path');
-const { parse } = require('csv-parse/sync');
+const fs = require('fs');
 
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true })); // aceita forms também
+const PORT = process.env.PORT || 3000;
 
-// ===== Sessão =====
-app.use(session({
-  name: 'diario.sid',
-  secret: process.env.SESSION_SECRET || 'mude-esta-secret-antes-de-produzir',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000*60*60*8 }
-}));
+// ===== MIDDLEWARE BÁSICO =====
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ===== DB =====
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'diario_obra.db');
-const db = new Database(DB_PATH);
-db.exec(`
-PRAGMA foreign_keys = ON;
+// servir arquivos estáticos (index.html, login.html, form.html, viewer.html etc.)
+app.use(express.static(path.join(__dirname, 'public')));
 
-CREATE TABLE IF NOT EXISTS diario (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  obra TEXT NOT NULL,
-  responsavel TEXT NOT NULL,
-  data TEXT NOT NULL,
-  observacoes TEXT
-);
-CREATE TABLE IF NOT EXISTS funcoes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  diario_id INTEGER NOT NULL,
-  funcao TEXT NOT NULL,
-  presente INTEGER DEFAULT 0,
-  ausente INTEGER DEFAULT 0,
-  ferias INTEGER DEFAULT 0,
-  FOREIGN KEY (diario_id) REFERENCES diario(id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS intercorrencia (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  diario_id INTEGER NOT NULL,
-  codigo INTEGER,
-  descricao TEXT,
-  FOREIGN KEY (diario_id) REFERENCES diario(id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS funcionarios (
-  chapa   TEXT PRIMARY KEY,
-  nome    TEXT,
-  funcao  TEXT
-);
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user'
-);
-`);
+// ===== ARQUIVO DE DIÁRIOS (JSON SIMPLES) =====
+const DB_DIR = path.join(__dirname, 'data');
+const DIARIOS_FILE = path.join(DB_DIR, 'diarios.json');
 
-// ===== Seeds de usuários (admin + engenheiro) =====
-function seedUsers(){
-  const defaults = [
-    { name:'Administrador', email:'admin@obra.local',      password:'admin123', role:'admin' },
-    { name:'Engenheiro',    email:'engenheiro@obra.local', password:'123456',  role:'user'  }
-  ];
-  const findByEmail = db.prepare(`SELECT id FROM users WHERE email=?`);
-  const insertUser  = db.prepare(`INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`);
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
 
-  for (const u of defaults){
-    const found = findByEmail.get(u.email);
-    if (!found){
-      const hash = bcrypt.hashSync(u.password, 10);
-      insertUser.run(u.name, u.email, hash, u.role);
-      console.log(`Seed user: ${u.email} / ${u.password}`);
-    }
+function carregarDiarios() {
+  if (!fs.existsSync(DIARIOS_FILE)) {
+    fs.writeFileSync(DIARIOS_FILE, JSON.stringify({ lastId: 0, itens: [] }, null, 2));
+  }
+  const conteudo = fs.readFileSync(DIARIOS_FILE, 'utf8');
+  try {
+    return JSON.parse(conteudo);
+  } catch (e) {
+    console.error('Erro ao ler diarios.json, recriando arquivo...', e);
+    const vazio = { lastId: 0, itens: [] };
+    fs.writeFileSync(DIARIOS_FILE, JSON.stringify(vazio, null, 2));
+    return vazio;
   }
 }
-seedUsers();
 
-// ===== Seed Funcionários de CSV (opcional) =====
-function seedFuncionariosCSV(){
-  try{
-    const csvPath = path.join(__dirname, 'funcionarios.csv');
-    if(!fs.existsSync(csvPath)) return;
-    const buf = fs.readFileSync(csvPath);
-    const rows = parse(buf.toString(), { columns: true, skip_empty_lines: true, delimiter: ';' });
-    const insert = db.prepare(`INSERT OR REPLACE INTO funcionarios (chapa,nome,funcao) VALUES (?,?,?)`);
-    const insertMany = db.transaction((list)=>{
-      for(const r of list){
-        const chapa = String(r.chapa || r.Chapa || '').trim();
-        const nome  = String(r.nome  || r.Nome  || '').trim();
-        const func  = String(r.funcao|| r.Função|| r.Funcao || '').trim();
-        if(chapa) insert.run(chapa, nome, func);
+function salvarDiarios(db) {
+  fs.writeFileSync(DIARIOS_FILE, JSON.stringify(db, null, 2));
+}
+
+// ===== USUÁRIOS (LOGIN SIMPLES) =====
+const USERS = [
+  { username: 'engenheiro', password: '123', role: 'engenheiro' },
+  { username: 'mestre', password: '123', role: 'mestre' },
+  { username: 'adm', password: '123', role: 'admin' }
+];
+
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+  }
+
+  const user = USERS.find(
+    u => u.username === username && u.password === password
+  );
+
+  if (!user) {
+    return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+  }
+
+  // retorno simples, sem token/jwt
+  res.json({
+    username: user.username,
+    role: user.role
+  });
+});
+
+// ===== ROTAS DE DIÁRIOS =====
+
+// salvar diário
+app.post('/api/diarios', (req, res) => {
+  try {
+    const payload = req.body || {};
+
+    if (!payload.obra || !payload.responsavel || !payload.data) {
+      return res.status(400).json({ error: 'Obra, responsável e data são obrigatórios.' });
+    }
+
+    // trava de intercorrência (já que o front faz, reforçamos aqui)
+    const intercorrencias = Array.isArray(payload.intercorrencias) ? payload.intercorrencias : [];
+    const temInterValida = intercorrencias.some(i => i.codigo || i.descricao);
+    if (!temInterValida) {
+      return res.status(400).json({ error: 'Preencha pelo menos uma intercorrência.' });
+    }
+
+    const db = carregarDiarios();
+    const novoId = db.lastId + 1;
+
+    const diario = {
+      id: novoId,
+      criadoEm: new Date().toISOString(),
+      ...payload
+    };
+
+    db.lastId = novoId;
+    db.itens.push(diario);
+    salvarDiarios(db);
+
+    res.status(201).json({ id: novoId });
+  } catch (err) {
+    console.error('Erro ao salvar diário:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar diário.' });
+  }
+});
+
+// listar diários (simples, sem filtro complexo)
+app.get('/api/diarios', (req, res) => {
+  try {
+    const db = carregarDiarios();
+    res.json(db.itens || []);
+  } catch (err) {
+    console.error('Erro ao listar diários:', err);
+    res.status(500).json({ error: 'Erro interno ao listar diários.' });
+  }
+});
+
+// obter diário por ID
+app.get('/api/diarios/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const db = carregarDiarios();
+    const diario = (db.itens || []).find(d => d.id === id);
+    if (!diario) {
+      return res.status(404).json({ error: 'Diário não encontrado.' });
+    }
+    res.json(diario);
+  } catch (err) {
+    console.error('Erro ao buscar diário:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar diário.' });
+  }
+});
+
+// ===== FUNCIONÁRIOS (CARREGAR CSVs) =====
+const funcionarios = [];
+
+// lê todos arquivos funcionarios*.csv do diretório /data
+function carregarFuncionarios() {
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      console.warn('Diretório data/ não existe, nenhum funcionário carregado.');
+      return;
+    }
+
+    const arquivos = fs.readdirSync(DB_DIR)
+      .filter(f => /^funcionarios.*\.csv$/i.test(f));
+
+    if (!arquivos.length) {
+      console.warn('Nenhum arquivo funcionarios*.csv encontrado em /data.');
+      return;
+    }
+
+    console.log('Arquivos de funcionários encontrados:', arquivos);
+
+    arquivos.forEach((nomeArq) => {
+      const caminho = path.join(DB_DIR, nomeArq);
+      const conteudo = fs.readFileSync(caminho, 'utf8');
+
+      const linhas = conteudo.split(/\r?\n/).filter(l => l.trim() !== '');
+      if (linhas.length < 2) return;
+
+      const headerLine = linhas[0];
+      const sep = headerLine.includes(';') ? ';' : ',';
+      const headers = headerLine.split(sep).map(h => h.trim());
+
+      for (let i = 1; i < linhas.length; i++) {
+        const linha = linhas[i];
+        if (!linha.trim()) continue;
+        const cols = linha.split(sep);
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = (cols[idx] || '').trim();
+        });
+        funcionarios.push(row);
       }
     });
-    insertMany(rows);
-    console.log(`Seed: ${rows.length} funcionários do CSV`);
-  }catch(err){
-    console.log('Seed funcionarios CSV ignorado:', err.message);
+
+    console.log(`Total de funcionários carregados: ${funcionarios.length}`);
+  } catch (err) {
+    console.error('Erro ao carregar funcionários dos CSVs:', err);
   }
 }
-seedFuncionariosCSV();
 
-// ===== Helpers de auth =====
-function requireAuth(req,res,next){
-  if(!req.session.user) return res.status(401).json({ error:'Não autenticado' });
-  next();
-}
-function requireRole(role){
-  return (req,res,next)=>{
-    if(!req.session.user) return res.status(401).json({ error:'Não autenticado' });
-    if(req.session.user.role !== role) return res.status(403).json({ error:'Sem permissão' });
-    next();
+// função auxiliar para padronizar campos de funcionário
+function mapFuncionario(row) {
+  let chapa =
+    row.chapa ||
+    row.CHAPA ||
+    row.Chapa ||
+    row['chapa'] ||
+    row['CHAPA'] ||
+    row['Chapa'];
+
+  let nome =
+    row.nome ||
+    row.NOME ||
+    row.Nome;
+
+  if (!nome) {
+    for (const k in row) {
+      if (k.toLowerCase().includes('nome')) {
+        nome = row[k];
+        break;
+      }
+    }
+  }
+
+  let funcao =
+    row.funcao ||
+    row.FUNCAO ||
+    row.Funcao ||
+    row['FUNÇÃO'] ||
+    row['Função'];
+
+  if (!funcao) {
+    for (const k in row) {
+      if (k.toLowerCase().includes('func')) {
+        funcao = row[k];
+        break;
+      }
+    }
+  }
+
+  return {
+    chapa: chapa ? String(chapa).trim() : '',
+    nome: nome ? String(nome).trim() : '',
+    funcao: funcao ? String(funcao).trim() : ''
   };
 }
 
-// ===== Rotas de Auth =====
-app.post('/api/login', (req,res)=>{
-  const { email, password } = req.body || {};
-  if(!email || !password) return res.status(400).json({ error:'Informe email e senha' });
+// normaliza string pra comparar função ignorando acento, caixa e espaços
+function normaliza(str) {
+  return (str || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
 
-  const user = db.prepare(`SELECT * FROM users WHERE email=?`).get(email);
-  if(!user) return res.status(400).json({ error:'Usuário ou senha inválidos' });
-  if(!bcrypt.compareSync(password, user.password_hash)){
-    return res.status(400).json({ error:'Usuário ou senha inválidos' });
-  }
-  req.session.user = { id:user.id, name:user.name, email:user.email, role:user.role };
-  res.json({ ok:true, user:req.session.user });
-});
+// GET /api/funcionarios?q=...
+// usado para autocomplete da chapa
+app.get('/api/funcionarios', (req, res) => {
+  const q = (req.query.q || '').toString().trim();
 
-app.post('/api/logout', (req,res)=>{
-  req.session.destroy(()=> res.json({ ok:true }));
-});
-
-app.get('/api/me', (req,res)=>{
-  res.json({ user: req.session.user || null });
-});
-
-// ===== CRUD de usuários (apenas admin) =====
-app.get('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
-  const list = db.prepare(`SELECT id,name,email,role FROM users ORDER BY id DESC`).all();
-  res.json(list);
-});
-
-// POST /api/users — cria novo usuário (usado pelo admin.html)
-app.post('/api/users', requireAuth, requireRole('admin'), (req,res)=>{
-  const body = req.body || {};
-
-  // tenta descobrir email, senha e perfil por vários nomes de campo
-  let email = (
-    body.email    ||
-    body.usuario  ||
-    body.user     ||
-    body.login    ||
-    ''
-  );
-  let password = (
-    body.password ||
-    body.senha    ||
-    body.pass     ||
-    body.novaSenha||
-    ''
-  );
-  let role = body.role || body.perfil || 'user';
-  let name = body.name || body.nome || '';
-
-  // fallback: se ainda não achou, pega os primeiros campos do body
-  const keys = Object.keys(body);
-  if (!email && keys.length > 0) {
-    email = body[keys[0]];
-  }
-  if (!password && keys.length > 1) {
-    password = body[keys[1]];
-  }
-  if (!role && keys.length > 2) {
-    role = body[keys[2]];
+  if (!q) {
+    return res.json(
+      funcionarios.slice(0, 50).map(mapFuncionario)
+    );
   }
 
-  email = String(email || '').trim();
-  password = String(password || '').trim();
-  role = String(role || 'user').trim();
+  const termo = q.toLowerCase();
 
-  if (!email || !password){
-    return res.status(400).json({ error:'Campos obrigatórios faltando' });
+  const filtrados = funcionarios.filter((row) => {
+    const f = mapFuncionario(row);
+    return (
+      f.chapa.toLowerCase().includes(termo) ||
+      f.nome.toLowerCase().includes(termo)
+    );
+  });
+
+  res.json(filtrados.slice(0, 50).map(mapFuncionario));
+});
+
+// GET /api/funcionarios/:chapa
+// usado quando o usuário escolhe uma chapa específica
+app.get('/api/funcionarios/:chapa', (req, res) => {
+  const chapaParam = req.params.chapa.toString().trim();
+
+  const row = funcionarios.find((r) => {
+    const f = mapFuncionario(r);
+    return f.chapa === chapaParam;
+  });
+
+  if (!row) {
+    return res.status(404).json({ error: 'Funcionário não encontrado' });
   }
 
-  if (!name || !String(name).trim()){
-    name = email.includes('@') ? email.split('@')[0] : email;
-  }
-
-  const hash = bcrypt.hashSync(password, 10);
-
-  try{
-    const info = db.prepare(
-      `INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)`
-    ).run(name, email, hash, role);
-    res.json({ id: info.lastInsertRowid });
-  }catch(err){
-    res.status(400).json({ error: err.message });
-  }
+  const f = mapFuncionario(row);
+  res.json(f);
 });
 
-app.put('/api/users/:id', requireAuth, requireRole('admin'), (req,res)=>{
-  const { name, email, password, role } = req.body || {};
-  const id = Number(req.params.id);
-  const u = db.prepare(`SELECT * FROM users WHERE id=?`).get(id);
-  if(!u) return res.status(404).json({ error:'Usuário não encontrado' });
-
-  let hash = u.password_hash;
-  if(password) hash = bcrypt.hashSync(password, 10);
-  try{
-    db.prepare(`UPDATE users SET name=?, email=?, password_hash=?, role=? WHERE id=?`)
-      .run(name || u.name, email || u.email, hash, role || u.role, id);
-    res.json({ ok:true });
-  }catch(err){
-    res.status(400).json({ error: err.message });
-  }
+// ===== HEALTHCHECK BÁSICO =====
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', funcionarios: funcionarios.length });
 });
 
-app.delete('/api/users/:id', requireAuth, requireRole('admin'), (req,res)=>{
-  const id = Number(req.params.id);
-  db.prepare(`DELETE FROM users WHERE id=?`).run(id);
-  res.json({ ok:true });
+// ===== INICIAR SERVIDOR =====
+carregarFuncionarios();
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
-
-// ===== Diários =====
-app.post('/api/diarios', (req,res)=>{
-  const { obra, responsavel, data, observacoes, funcoes, intercorrencias } = req.body || {};
-  if(!obra || !responsavel || !data) return res.status(400).json({ error:'Campos obrigatórios faltando' });
-
-  const insertDiario = db.prepare(`INSERT INTO diario (obra,responsavel,data,observacoes) VALUES (?,?,?,?)`);
-  const insertFunc   = db.prepare(`INSERT INTO funcoes (diario_id,funcao,presente,ausente,ferias) VALUES (?,?,?,?,?)`);
-  const insertInter  = db.prepare(`INSERT INTO intercorrencia (diario_id,codigo,descricao) VALUES (?,?,?)`);
-
-  try{
-    const tx = db.transaction(()=>{
-      const info = insertDiario.run(obra, responsavel, data, observacoes || null);
-      const id = info.lastInsertRowid;
-
-      if(Array.isArray(funcoes)){
-        for(const f of funcoes){
-          insertFunc.run(
-            id,
-            f.funcao,
-            Number(f.presente||0),
-            Number(f.ausente||0),
-            Number(f.ferias||0)
-          );
-        }
-      }
-      if(Array.isArray(intercorrencias)){
-        for(const it of intercorrencias){
-          const codigo = it.codigo ? Number(it.codigo) : null;
-          const desc   = (it.descricao || '').trim() || null;
-          if(codigo || desc) insertInter.run(id, codigo, desc);
-        }
-      }
-      return id;
-    });
-    const novoId = tx();
-    res.json({ id: novoId });
-  }catch(err){
-    console.error(err);
-    res.status(500).json({ error:'Falha ao salvar diário' });
-  }
-});
-
-app.get('/api/diarios', requireAuth, (req,res)=>{
-  const list = db.prepare(`
-    SELECT d.id, d.obra, d.responsavel, d.data, d.observacoes
-    FROM diario d
-    ORDER BY d.id DESC
-    LIMIT 200
-  `).all();
-  res.json(list);
-});
-
-app.get('/api/diarios/:id', requireAuth, (req,res)=>{
-  const id = Number(req.params.id);
-  const d = db.prepare(`SELECT * FROM diario WHERE id=?`).get(id);
-  if(!d) return res.status(404).json({ error:'Não encontrado' });
-
-  const funcoes = db.prepare(`SELECT funcao,presente,ausente,ferias FROM funcoes WHERE diario_id=?`).all(id);
-  const inter   = db.prepare(`SELECT codigo,descricao FROM intercorrencia WHERE diario_id=?`).all(id);
-  res.json({ ...d, funcoes, intercorrencias: inter });
-});
-
-// ===== Funcionários (autocomplete) =====
-app.get('/api/funcionarios', (req,res)=>{
-  const q = String(req.query.q || '').trim();
-  if(!q) return res.json([]);
-
-  const rows = db.prepare(`
-    SELECT chapa,nome,funcao
-    FROM funcionarios
-    WHERE chapa LIKE ? OR LOWER(nome) LIKE LOWER(?)
-    ORDER BY chapa
-    LIMIT 20
-  `).all(`%${q}%`, `%${q}%`);
-  res.json(rows);
-});
-
-app.get('/api/funcionarios/:chapa', (req,res)=>{
-  const chapa = String(req.params.chapa || '').trim();
-  if(!chapa) return res.status(400).json({ error:'Chapa obrigatória' });
-
-  const row = db.prepare(`SELECT chapa,nome,funcao FROM funcionarios WHERE chapa=?`).get(chapa);
-  if (!row) return res.status(404).json({ error:'Funcionário não encontrado' });
-  res.json(row);
-});
-
-// ===== Proteção de páginas =====
-app.get(['/viewer.html','/details.html'], requireAuth, (req,res,next)=>next());
-app.get(['/admin.html'], requireAuth, requireRole('admin'), (req,res,next)=>next());
-
-// ===== Estáticos e raiz =====
-app.use(express.static('.'));
-app.get('/', (_req,res)=>res.sendFile(path.join(__dirname, 'index.html')));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=> console.log(`API rodando em http://localhost:${PORT}`));
