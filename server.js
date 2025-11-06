@@ -1,4 +1,5 @@
-// server.js
+// server.
+js
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -84,14 +85,48 @@ function requireLogin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
-  next();
+
+  // garante que o usuário ainda existe e está ativo
+  try {
+    const user = db
+      .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
+      .get(req.session.userId);
+
+    if (!user || !user.ativo) {
+      return res.status(401).json({ error: 'Sessão inválida.' });
+    }
+
+    // atualiza perfil na sessão se mudou no banco
+    req.session.perfil = user.perfil;
+    next();
+  } catch (err) {
+    console.error('Erro em requireLogin:', err);
+    return res.status(500).json({ error: 'Erro de sessão.' });
+  }
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session.userId || req.session.perfil !== 'admin') {
-    return res.status(403).json({ error: 'Acesso negado' });
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Não autenticado' });
   }
-  next();
+
+  // SEMPRE consulta o banco pra garantir que é admin
+  try {
+    const user = db
+      .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
+      .get(req.session.userId);
+
+    if (!user || !user.ativo || user.perfil !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    // corrige/atualiza o perfil na sessão
+    req.session.perfil = user.perfil;
+    next();
+  } catch (err) {
+    console.error('Erro em requireAdmin:', err);
+    return res.status(500).json({ error: 'Erro de sessão.' });
+  }
 }
 
 // rota de login
