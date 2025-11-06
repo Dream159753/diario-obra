@@ -169,8 +169,8 @@
 
 <script>
 /* ====== CONFIG API ====== */
-/* aponta direto pro Render */
-const API = 'https://diario-obra.onrender.com';
+/* caminho relativo: funciona no Render e local */
+const API = '';
 
 /* Catálogo (inclui código 0) */
 const CATALOG = [
@@ -216,7 +216,6 @@ function renderTotalGeral(){ document.getElementById('totalGeral').textContent =
 /* ======= AUSENTES ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
 
-/* usa função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO...) para escolher a variação correta no select */
 function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
   if(!funcaoRaw) return;
   const alvo = funcaoRaw.toString().trim().toUpperCase();
@@ -235,7 +234,6 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  // busca dados completos pela chapa
   inputChapa.addEventListener('blur', async ()=>{
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
@@ -244,7 +242,6 @@ function wireChapaAutocomplete(tr){
       if(r.ok){
         const f = await r.json();
 
-        // nome: do backend ou, se vier vazio, do label do datalist
         let nome = f.nome || '';
         if(!nome){
           const optDl = Array.from(dl.options).find(o=>o.value===chapa);
@@ -252,7 +249,6 @@ function wireChapaAutocomplete(tr){
         }
         inputNome.value = nome;
 
-        // função simplificada
         if(f.funcao){
           aplicarFuncaoSimplificada(selectFunc, f.funcao);
         }
@@ -262,7 +258,6 @@ function wireChapaAutocomplete(tr){
     }
   });
 
-  // autocomplete de chapas
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
     const term = inputChapa.value.trim();
@@ -442,7 +437,6 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
 
-  // validação: identificação e pelo menos 1 intercorrência
   const erros = [];
   if(!payload.obra)        erros.push('Informe a obra.');
   if(!payload.responsavel) erros.push('Informe o responsável.');
