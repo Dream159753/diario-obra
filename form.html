@@ -44,11 +44,10 @@
   .btn{ padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
   .btn:hover{ filter:brightness(.95); }
   .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
-  .btn-ghost{ padding:10px 18px; background:#eef2f6; color:#333; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
-  .btn-ghost:hover{ filter:brightness(.97); }
+  .btn-ghost{ background:#eef2f6; color:#333; }
   .del{ background:#e74c3c; color:#fff; }
   .del:hover{ filter:brightness(.95); }
-  .foot-actions{ padding:16px; text-align:center; display:flex; gap:12px; justify-content:center; }
+  .foot-actions{ padding:16px; text-align:center; }
   .pill{ font-size:12px; padding:6px 10px; border-radius:999px; background:#eef2f6; color:#333; }
   .pill.ok{ background:#eaf7f0; color:var(--ok); border:1px solid #cdeedd; }
   .pill.warn{ background:#fdecea; color:var(--warn); border:1px solid #f7c6c1; }
@@ -70,7 +69,7 @@
     </table>
     <div class="bar">
       <div class="meta"><strong>Dica:</strong> preencha a identificação antes de registrar as presenças.</div>
-      <button type="button" class="btn-ghost" id="limpar">Zerar Tudo</button>
+      <button type="button" class="btn btn-ghost" id="limpar">Zerar Tudo</button>
     </div>
   </div>
 
@@ -88,7 +87,7 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <!-- (todas as funções) -->
+        <!-- TODAS AS FUNÇÕES (NÃO MEXER) -->
         <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
@@ -164,62 +163,41 @@
     </div>
   </div>
 
-  <!-- BOTÕES FINAIS -->
-  <div class="foot-actions">
-    <button type="submit" class="btn">Salvar Diário</button>
-    <button type="button" class="btn-ghost" id="btnPdf">Salvar em PDF</button>
-  </div>
+  <!-- BOTÃO FINAL -->
+  <div class="foot-actions"><button type="submit" class="btn">Salvar Diário</button></div>
 </form>
 
 <script>
 /* ====== CONFIG API ====== */
-const API = ''; // mesma origem (Render ou local)
+/* usa o mesmo domínio do backend (/api/...) */
+const API = '';
 
-/* Catálogo (AGORA com código 0 também) */
+/* Catálogo (incluindo código 0 pedido) */
 const CATALOG = [
-  {code:0,  title:'Sem intercorrencias', model:'Não houve intercorrencias que afetam a produção.'},
-  {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
-  {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
-  {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
-  {code:15, title:'Grua quebrada', model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
-  {code:16, title:'Interdição de área', model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
-  {code:18, title:'Acidente/ocorrência', model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
-  {code:19, title:'Fiscalização/Paralisação', model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
-  {code:20, title:'Dúvida técnica/Projeto', model:'Dúvida técnica de projeto (item) — aguardando definição.'},
-  {code:22, title:'Falta de água', model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
-  {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
-  {code:26, title:'Vistoria externa', model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
+  {code:0,  title:'Sem intercorrências',         model:'Não houve intercorrencias que afetam a produção.'},
+  {code:10, title:'Falta de material',           model:'Falta de material (especificar) das HH:MM às HH:MM.'},
+  {code:11, title:'Chuva intensa',               model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
+  {code:12, title:'Falta de energia',            model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
+  {code:15, title:'Grua quebrada',               model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
+  {code:16, title:'Interdição de área',          model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
+  {code:18, title:'Acidente/ocorrência',         model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
+  {code:19, title:'Fiscalização/Paralisação',    model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
+  {code:20, title:'Dúvida técnica/Projeto',      model:'Dúvida técnica de projeto (item) — aguardando definição.'},
+  {code:22, title:'Falta de água',               model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
+  {code:25, title:'Problema logístico/acesso',   model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
+  {code:26, title:'Vistoria externa',            model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
+  {code:28, title:'Greve/Manifestação',          model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
 ];
 
-/* LISTA DE FUNÇÕES PARA O SELECT DOS AUSENTES */
 const FUNCOES = [
-  "ADMINISTRATIVO",
-  "MESTRE",
-  "ENCARREGADO",
-
-  // SIMPLIFICADAS (CSV)
-  "CARPINTEIRO",
-  "ARMADOR",
-  "PEDREIRO",
-  "SERVENTE",
-  "REJUNTADOR",
-  "SINALEIRO",
-  "SOLDADOR",
-  "TEC. DE SEGURANÇA DO TRABALHO",
-
-  // DETALHADAS
-  "CARPINTEIRO TORRE","CARPINTEIRO PERIFERIA",
-  "CARPINTEIRO DE PROTEÇÃO","CARPINTEIRO SERRA E CAIXINHA",
-  "ARMADOR TORRE","ARMADOR PERIFERIA","ARMADOR ENROLANDO ARAME",
-  "PEDREIRO DE ELEVAÇÃO ESTRUTURAL","PEDREIRO MARCAÇÃO",
-  "PEDREIRO CHAPISCO + TIRO","PEDREIRO ALVENARIA VEDAÇÃO","PEDREIRO MASSA",
-  "PEDREIRO CONTRA PISO","PEDREIRO CHUMBAMENTO PCF",
-  "PEDREIRO DE REGULARIZAÇÃO P/ GESSO",
-  "PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA",
+  "ADMINISTRATIVO","MESTRE","ENCARREGADO","CARPINTEIRO TORRE","CARPINTEIRO PERIFERIA",
+  "CARPINTEIRO DE PROTEÇÃO","CARPINTEIRO SERRA E CAIXINHA","ARMADOR TORRE","ARMADOR PERIFERIA",
+  "ARMADOR ENROLANDO ARAME","PEDREIRO DE ELEVAÇÃO ESTRUTURAL","PEDREIRO MARCAÇÃO",
+  "PEDREIRO CHAPISCO + TIRO","PEDREIRO ALVENARIA VEDAÇÃO","PEDREIRO MASSA","PEDREIRO CONTRA PISO",
+  "PEDREIRO CHUMBAMENTO PCF","PEDREIRO DE REGULARIZAÇÃO P/ GESSO","PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA",
   "PEDREIRO CONTRA MARCO","PEDREIRO REGULARIZAÇÃO DE ESCADA",
   "PEDREIRO DE REGULARIZAÇÃO POÇO DO ELEVADOR E PRESSURIZAÇÃO",
-  "PEDREIRO DE ARREMATE"
+  "PEDREIRO DE ARREMATE","REJUNTADOR","SERVENTE","SINALEIRO","SOLDADOR","TEC. DE SEGURANÇA DO TRABALHO"
 ];
 
 const toInt = v => parseInt(v,10)||0;
@@ -231,23 +209,24 @@ function atualizarLinha(tr){
   const fer = toInt(tr.querySelector('input[data-tipo="ferias"]').value);
   tr.querySelector('.total-funcao').textContent = pre + aus + fer;
 }
-function totalGeral(){
-  let s=0;
-  document.querySelectorAll('.total-funcao').forEach(td=>s+=toInt(td.textContent));
-  return s;
-}
-function totalAusentesInformados(){
-  let s=0;
-  document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value));
-  return s;
-}
-function renderTotalGeral(){
-  document.getElementById('totalGeral').textContent = totalGeral();
-}
+function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEach(td=>s+=toInt(td.textContent)); return s; }
+function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
+function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
 
 /* ======= AUSENTES (com autocomplete por chapa) ======= */
-function optFuncoesHTML(){
-  return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join('');
+function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
+
+/* mapeia função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO, ...) para a primeira opção do select que começa com esse texto */
+function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
+  if(!funcaoRaw) return;
+  const alvo = funcaoRaw.toString().trim().toUpperCase();
+  if(!alvo) return;
+  const opcoes = Array.from(selectFunc.options);
+  const match = opcoes.find(o=>{
+    const txt = o.value.toUpperCase();
+    return txt===alvo || txt.startsWith(alvo+" ");
+  });
+  if(match) selectFunc.value = match.value;
 }
 
 function wireChapaAutocomplete(tr){
@@ -256,33 +235,34 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  // Buscar funcionário pela chapa ao sair do campo
+  // BLUR: buscar funcionário pela chapa
   inputChapa.addEventListener('blur', async ()=>{
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
       const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
-      if(!r.ok) return;
-      const f = await r.json();
-      const nomeCsv   = (f.nome   || '').trim();
-      const funcaoCsv = (f.funcao || '').trim(); // ex.: CARPINTEIRO, ARMADOR, PEDREIRO, SERVENTE
+      if(r.ok){
+        const f = await r.json();
 
-      if(nomeCsv) inputNome.value = nomeCsv;
-
-      if(funcaoCsv){
-        let opt = Array.from(selectFunc.options).find(o => o.value === funcaoCsv);
-        if(!opt){
-          opt = new Option(funcaoCsv, funcaoCsv);
-          selectFunc.add(opt);
+        // Nome: usa o da API; se vier vazio, usa o label do datalist
+        let nome = f.nome || '';
+        if(!nome){
+          const optDl = Array.from(dl.options).find(o => o.value === chapa);
+          if(optDl && optDl.label) nome = optDl.label;
         }
-        selectFunc.value = funcaoCsv;
+        inputNome.value = nome;
+
+        // Função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO...)
+        if(f.funcao){
+          aplicarFuncaoSimplificada(selectFunc, f.funcao);
+        }
       }
     }catch(e){
-      console.error('Erro ao buscar funcionário pela chapa:', e);
+      console.error(e);
     }
   });
 
-  // Autocomplete de chapas
+  // AUTO-COMPLETE: popular datalist de chapas
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
     const term = inputChapa.value.trim();
@@ -292,11 +272,10 @@ function wireChapaAutocomplete(tr){
       try{
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
         const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista.map(p =>
-          `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`
-        ).join('');
-      }catch(err){
-        console.error('Erro no autocomplete de funcionários:', err);
+        dl.innerHTML = lista
+          .map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`)
+          .join('');
+      }catch{
         dl.innerHTML='';
       }
     },200);
@@ -317,7 +296,6 @@ function novaLinhaAusente(){
   wireChapaAutocomplete(tr);
   return tr;
 }
-
 function contarAusentesListados(){
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
@@ -337,10 +315,9 @@ function atualizarBadgeAusentes(){
 }
 
 /* ======= INTERCORRÊNCIAS ======= */
-const dlInter=document.getElementById('listaCodigos');
-const catBody=document.getElementById('catalogoBody');
+const dl=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
 function renderCatalogo(){
-  dlInter.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
+  dl.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
   catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
 }
 function novaLinhaInter(cod="",desc=""){
@@ -379,9 +356,7 @@ function autoDescricaoPorCodigo(inputCodigo){
 /* ======= EVENTOS ======= */
 document.getElementById('tbody').addEventListener('input', e=>{
   if(e.target.matches('input[type="number"]')){
-    atualizarLinha(e.target.closest('tr'));
-    renderTotalGeral();
-    atualizarBadgeAusentes();
+    atualizarLinha(e.target.closest('tr')); renderTotalGeral(); atualizarBadgeAusentes();
   }
 });
 document.getElementById('limpar').addEventListener('click', ()=>{
@@ -394,35 +369,25 @@ document.getElementById('limpar').addEventListener('click', ()=>{
   document.querySelector('[name="observacoes"]').value='';
   document.getElementById('tbodyAusentes').innerHTML='';
   document.getElementById('tbodyInter').innerHTML='';
-  atualizarBadgeAusentes();
-  atualizarBadgeInter();
+  atualizarBadgeAusentes(); atualizarBadgeInter();
 });
 document.getElementById('addAusente').addEventListener('click', ()=>{
-  document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente());
-  atualizarBadgeAusentes();
+  document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente()); atualizarBadgeAusentes();
 });
 document.getElementById('tbodyAusentes').addEventListener('click', e=>{
-  if(e.target.closest('.del')){
-    e.target.closest('tr').remove();
-    atualizarBadgeAusentes();
-  }
+  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeAusentes(); }
 });
 document.getElementById('tbodyAusentes').addEventListener('input', atualizarBadgeAusentes);
 document.getElementById('tbodyAusentes').addEventListener('change', atualizarBadgeAusentes);
 
 document.getElementById('addInter').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter());
-  atualizarBadgeInter();
+  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
 });
 document.getElementById('addInter2').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter());
-  atualizarBadgeInter();
+  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
 });
 document.getElementById('tbodyInter').addEventListener('click', e=>{
-  if(e.target.closest('.del')){
-    e.target.closest('tr').remove();
-    atualizarBadgeInter();
-  }
+  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeInter(); }
 });
 document.getElementById('tbodyInter').addEventListener('input', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
@@ -432,17 +397,11 @@ document.getElementById('tbodyInter').addEventListener('change', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
 });
 
-document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
-  const cat = document.getElementById('catalogo');
-  cat.style.display = cat.style.display === 'block' ? 'none' : 'block';
-});
-
 window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
-  renderTotalGeral();
-  atualizarBadgeAusentes();
-  renderCatalogo();
-  atualizarBadgeInter();
+  renderTotalGeral(); atualizarBadgeAusentes();
+  renderCatalogo(); atualizarBadgeInter();
+  document.querySelectorAll('#tbodyAusentes tr').forEach(tr => wireChapaAutocomplete(tr));
 });
 
 /* ======= INTEGRAÇÃO COM O BACKEND ======= */
@@ -452,8 +411,7 @@ function coletarPayload(){
   const data        = document.querySelector('[name="data"]').value;
   const observacoes = document.querySelector('[name="observacoes"]').value.trim();
 
-  const funcoes=[];
-  document.querySelectorAll('#tbody tr').forEach(tr=>{
+  const funcoes=[]; document.querySelectorAll('#tbody tr').forEach(tr=>{
     funcoes.push({
       funcao: tr.querySelector('.fun').textContent.trim(),
       presente: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
@@ -461,18 +419,14 @@ function coletarPayload(){
       ferias:   parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
     });
   });
-
-  const ausentes=[];
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+  const ausentes=[]; document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     ausentes.push({
       chapa: tr.querySelector('[name="aus_chapa"]').value.trim(),
       nome: tr.querySelector('[name="aus_nome"]').value.trim(),
       funcao: tr.querySelector('[name="aus_funcao"]').value
     });
   });
-
-  const intercorrencias=[];
-  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
+  const intercorrencias=[]; document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
     intercorrencias.push({
       codigo: tr.querySelector('[name="inter_codigo"]').value.trim(),
       descricao: tr.querySelector('[name="inter_desc"]').value.trim()
@@ -485,11 +439,28 @@ function coletarPayload(){
 document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
+
+  // validação extra: identificação + pelo menos 1 intercorrência (inclusive código 0)
+  const erros = [];
+  if(!payload.obra)        erros.push('Informe a obra.');
+  if(!payload.responsavel) erros.push('Informe o responsável.');
+  if(!payload.data)        erros.push('Informe a data.');
+  const interValidas = payload.intercorrencias.filter(i => i.codigo || i.descricao);
+  if(interValidas.length === 0){
+    erros.push('Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto na produção).');
+  }
+  if(erros.length){
+    alert(erros.join('\n'));
+    return;
+  }
+  payload.intercorrencias = interValidas;
+
   try{
     const resp = await fetch(`${API}/api/diarios`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
+      body:JSON.stringify(payload),
+      credentials:'include'
     });
     const json = await resp.json();
     if(!resp.ok){
@@ -501,11 +472,6 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
     console.error(err);
     alert('Não foi possível conectar ao servidor.');
   }
-});
-
-/* ======= SALVAR EM PDF (impressão) ======= */
-document.getElementById('btnPdf').addEventListener('click', ()=>{
-  window.print();
 });
 </script>
 </body>
