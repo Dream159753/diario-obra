@@ -6,184 +6,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
-      --bg:#f4f6fb;
-      --card:#ffffff;
-      --prim:#3A6385;
-      --prim-dark:#284666;
-      --muted:#7b8794;
-      --border:#e2e8f0;
-      --danger:#e53e3e;
+      --bg:#f4f6fb; --card:#ffffff; --prim:#3A6385; --prim-dark:#284666;
+      --muted:#7b8794; --border:#e2e8f0; --danger:#e53e3e;
     }
-    *{box-sizing:border-box;}
-    body{
-      margin:0;
-      font-family: Arial, sans-serif;
-      background:var(--bg);
-      color:#1f2933;
-    }
-    header{
-      background:#fff;
-      border-bottom:1px solid var(--border);
-      padding:16px 24px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      position:sticky;
-      top:0;
-      z-index:10;
-    }
-    header h1{
-      margin:0;
-      font-size:20px;
-      font-weight:600;
-      color:#102a43;
-    }
-    header small{
-      display:block;
-      font-size:12px;
-      color:var(--muted);
-    }
-    .user-area{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      font-size:14px;
-      color:var(--muted);
-    }
-    .btn{
-      padding:8px 14px;
-      border-radius:6px;
-      border:none;
-      cursor:pointer;
-      font-size:14px;
-      background:var(--prim);
-      color:#fff;
-    }
-    .btn:hover{background:var(--prim-dark);}
-    .btn-outline{
-      background:#fff;
-      color:var(--prim);
-      border:1px solid var(--prim);
-    }
-    .btn-outline:hover{
-      background:var(--prim);
-      color:#fff;
-    }
-    main{
-      max-width:1100px;
-      margin:24px auto 40px;
-      padding:0 16px;
-    }
-    .card{
-      background:var(--card);
-      border-radius:10px;
-      box-shadow:0 8px 24px rgba(15,23,42,.06);
-      padding:16px 18px 20px;
-      margin-bottom:18px;
-    }
-    .filters{
-      display:grid;
-      grid-template-columns:repeat(6, minmax(0, 1fr));
-      gap:10px;
-      align-items:end;
-    }
-    label{
-      font-size:12px;
-      color:var(--muted);
-      margin-bottom:2px;
-      display:block;
-    }
-    input, select{
-      width:100%;
-      padding:7px 8px;
-      border-radius:6px;
-      border:1px solid var(--border);
-      font-size:13px;
-      outline:none;
-    }
-    input:focus, select:focus{
-      border-color:var(--prim);
-      box-shadow:0 0 0 2px rgba(58,99,133,.16);
-    }
-    .filters-buttons{
-      display:flex;
-      gap:8px;
-      justify-content:flex-end;
-      margin-top:10px;
-    }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      font-size:14px;
-    }
-    thead th{
-      background:var(--prim);
-      color:#fff;
-      padding:10px 8px;
-      text-align:left;
-      position:sticky;
-      top:72px;
-      z-index:5;
-    }
-    tbody td{
-      border-bottom:1px solid var(--border);
-      padding:8px 8px;
-    }
-    tbody tr:nth-child(even){
-      background:#f8fafc;
-    }
-    tbody tr:hover{
-      background:#edf2f7;
-    }
-    .badge{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      min-width:26px;
-      padding:2px 8px;
-      border-radius:999px;
-      background:#edf2ff;
-      color:var(--prim);
-      font-size:12px;
-      font-weight:600;
-    }
-    .empty{
-      text-align:center;
-      padding:16px;
-      color:var(--muted);
-      font-size:14px;
-    }
-    .link{
-      border:none;
-      background:none;
-      color:var(--prim);
-      cursor:pointer;
-      font-size:13px;
-      padding:0;
-      text-decoration:underline;
-    }
-    .error{
-      margin-top:10px;
-      font-size:13px;
-      color:var(--danger);
-    }
-    @media (max-width:900px){
-      .filters{
-        grid-template-columns:repeat(2,minmax(0,1fr));
-      }
-      thead th{top:96px;}
-    }
-    @media (max-width:600px){
-      .filters{
-        grid-template-columns:1fr;
-      }
-      header{
-        flex-direction:column;
-        align-items:flex-start;
-        gap:6px;
-      }
-      thead th{top:126px;}
-    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#1f2933}
+    header{background:#fff;border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    header h1{margin:0;font-size:20px;font-weight:600;color:#102a43}
+    header small{display:block;font-size:12px;color:var(--muted)}
+    .user-area{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}
+    .btn{padding:8px 14px;border-radius:6px;border:none;cursor:pointer;font-size:14px;background:var(--prim);color:#fff}
+    .btn:hover{background:var(--prim-dark)}
+    .btn-outline{background:#fff;color:var(--prim);border:1px solid var(--prim)}
+    .btn-outline:hover{background:var(--prim);color:#fff}
+    main{max-width:1100px;margin:24px auto 40px;padding:0 16px}
+    .card{background:var(--card);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.06);padding:16px 18px 20px;margin-bottom:18px}
+    .filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end}
+    label{font-size:12px;color:var(--muted);margin-bottom:2px;display:block}
+    input,select{width:100%;padding:7px 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;outline:none}
+    input:focus,select:focus{border-color:var(--prim);box-shadow:0 0 0 2px rgba(58,99,133,.16)}
+    .filters-buttons{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead th{background:var(--prim);color:#fff;padding:10px 8px;text-align:left;position:sticky;top:72px;z-index:5}
+    tbody td{border-bottom:1px solid var(--border);padding:8px 8px}
+    tbody tr:nth-child(even){background:#f8fafc}
+    tbody tr:hover{background:#edf2f7}
+    .badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:2px 8px;border-radius:999px;background:#edf2ff;color:var(--prim);font-size:12px;font-weight:600}
+    .empty{text-align:center;padding:16px;color:var(--muted);font-size:14px}
+    .link{border:none;background:none;color:var(--prim);cursor:pointer;font-size:13px;padding:0;text-decoration:underline}
+    .error{margin-top:10px;font-size:13px;color:var(--danger)}
+    @media (max-width:900px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))} thead th{top:96px}}
+    @media (max-width:600px){.filters{grid-template-columns:1fr} header{flex-direction:column;align-items:flex-start;gap:6px} thead th{top:126px}}
   </style>
 </head>
 <body>
@@ -199,7 +52,6 @@
 </header>
 
 <main>
-  <!-- FILTROS -->
   <section class="card">
     <div class="filters">
       <div>
@@ -234,7 +86,6 @@
     <div id="errorBox" class="error" style="display:none;"></div>
   </section>
 
-  <!-- LISTA -->
   <section class="card">
     <table>
       <thead>
@@ -248,225 +99,192 @@
           <th style="width:110px;">Ações</th>
         </tr>
       </thead>
-      <tbody id="tbodyDiarios">
-      </tbody>
+      <tbody id="tbodyDiarios"></tbody>
     </table>
-    <div id="emptyState" class="empty" style="display:none;">
-      Nenhum diário encontrado.
-    </div>
+    <div id="emptyState" class="empty" style="display:none;">Nenhum diário encontrado.</div>
   </section>
 </main>
 
 <script>
-  // ---------- UTIL ----------
-  function formatarDataIsoParaBr(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const ano = d.getFullYear();
-    return `${dia}/${mes}/${ano}`;
+  // --------- Utils
+  function formatarDataIsoParaBr(iso){
+    if(!iso) return '';
+    const d=new Date(iso); if(Number.isNaN(d.getTime())) return '';
+    const dd=String(d.getDate()).padStart(2,'0');
+    const mm=String(d.getMonth()+1).padStart(2,'0');
+    const yy=d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
   }
-
-  // Calcula totais a partir do diário
-  function calcularTotais(diario) {
-    if (typeof diario.presentes === 'number' ||
-        typeof diario.ausentes === 'number' ||
-        typeof diario.ferias === 'number') {
-
-      const presentes = Number(diario.presentes || 0);
-      const ausentes  = Number(diario.ausentes  || 0);
-      const ferias    = Number(diario.ferias    || 0);
-      return {
-        presentes,
-        ausentes,
-        ferias,
-        total: presentes + ausentes + ferias
-      };
+  function parseBrDate(str){ // dd/mm/aaaa -> Date
+    if(!str) return null;
+    const [d,m,y]=(str||'').split('/');
+    const dt=new Date(`${y}-${m}-${d}T00:00:00`);
+    return Number.isNaN(dt.getTime())?null:dt;
+  }
+  function getDateObjFromDiario(d){
+    if(d.data){ const iso=new Date(d.data); if(!Number.isNaN(iso.getTime())) return iso; }
+    if(d.dataBr){ const br=parseBrDate(d.dataBr); if(br) return br; }
+    return null;
+  }
+  function calcularTotais(diario){
+    if(['presentes','ausentes','ferias'].some(k => typeof diario[k]==='number')){
+      const presentes=Number(diario.presentes||0);
+      const ausentes =Number(diario.ausentes ||0);
+      const ferias   =Number(diario.ferias   ||0);
+      return { presentes, ausentes, ferias, total: presentes+ausentes+ferias };
     }
-
-    let presentes = 0, ausentes = 0, ferias = 0;
-    if (Array.isArray(diario.funcoes)) {
-      diario.funcoes.forEach(f => {
-        presentes += Number(f.presente || 0);
-        ausentes  += Number(f.ausente  || 0);
-        ferias    += Number(f.ferias   || 0);
+    let p=0,a=0,f=0;
+    if(Array.isArray(diario.funcoes)){
+      diario.funcoes.forEach(fn=>{
+        p+=Number(fn.presente||0);
+        a+=Number(fn.ausente ||0);
+        f+=Number(fn.ferias  ||0);
       });
     }
-
-    return {
-      presentes,
-      ausentes,
-      ferias,
-      total: presentes + ausentes + ferias
-    };
+    return { presentes:p, ausentes:a, ferias:f, total:p+a+f };
   }
 
-  // ---------- AUTENTICAÇÃO ----------
-  async function carregarUsuario() {
-    try {
-      const resp = await fetch('/api/me', { credentials:'include' });
-      if (!resp.ok) {
-        window.location.href = 'login.html';
-        return;
-      }
-      const data = await resp.json();
-      const user = data && data.user;
-      if (!user) {
-        window.location.href = 'login.html';
-        return;
-      }
-      const email = user.email || '';
-      const nomeCurto = email.split('@')[0] || email || 'usuário';
-      document.getElementById('userGreeting').textContent = `Olá, ${nomeCurto}`;
-    } catch (e) {
-      console.error(e);
-      window.location.href = 'login.html';
-    }
+  // --------- Auth
+  async function carregarUsuario(){
+    try{
+      const r=await fetch('/api/me',{credentials:'include'});
+      if(!r.ok){ location.href='login.html'; return; }
+      const {user}=await r.json();
+      if(!user){ location.href='login.html'; return; }
+      const email=user.email||'';
+      document.getElementById('userGreeting').textContent=`Olá, ${(email.split('@')[0]||'usuário')}`;
+    }catch{ location.href='login.html'; }
+  }
+  async function logout(){
+    try{ await fetch('/api/logout',{method:'POST',credentials:'include'}); }finally{ location.href='login.html'; }
   }
 
-  async function logout() {
-    try {
-      await fetch('/api/logout', { method:'POST', credentials:'include' });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      window.location.href = 'login.html';
-    }
-  }
+  // --------- Load + Filter
+  async function carregarDiarios(){
+    const tbody=document.getElementById('tbodyDiarios');
+    const empty=document.getElementById('emptyState');
+    const error=document.getElementById('errorBox');
+    tbody.innerHTML=''; empty.style.display='none'; error.style.display='none';
 
-  // ---------- CARREGAR DIÁRIOS ----------
-  async function carregarDiarios() {
-    const tbody = document.getElementById('tbodyDiarios');
-    const empty = document.getElementById('emptyState');
-    const errorBox = document.getElementById('errorBox');
-    tbody.innerHTML = '';
-    empty.style.display = 'none';
-    errorBox.style.display = 'none';
-
-    const params = new URLSearchParams();
-
+    const q = new URLSearchParams();
     const obra = document.getElementById('fObra').value.trim();
     const resp = document.getElementById('fResp').value.trim();
-    const dDe  = document.getElementById('fDataDe').value;
-    const dAte = document.getElementById('fDataAte').value;
-    const cod  = document.getElementById('fCodigoInter').value.trim();
-    const txt  = document.getElementById('fBuscaLivre').value.trim();
+    const dataDe  = document.getElementById('fDataDe').value;   // yyyy-mm-dd
+    const dataAte = document.getElementById('fDataAte').value;  // yyyy-mm-dd
+    const cod = document.getElementById('fCodigoInter').value.trim();
+    const txt = document.getElementById('fBuscaLivre').value.trim();
 
-    if (obra) params.set('obra', obra);
-    if (resp) params.set('responsavel', resp);
-    if (dDe)  params.set('dataDe', dDe);
-    if (dAte) params.set('dataAte', dAte);
-    // deixa o servidor livre pra usar esses se ele já tiver pronto:
-    if (txt)  params.set('q', txt);
+    // deixa para o backend filtrar o que ele já suporta
+    if(obra) q.set('obra', obra);
+    if(resp) q.set('responsavel', resp);
+    // NÃO envio as datas/cód/busca livre — garanto no front para evitar diferenças de formato.
 
-    try {
-      const respFetch = await fetch('/api/diarios?' + params.toString(), {
-        credentials:'include'
-      });
+    try{
+      const r=await fetch('/api/diarios?'+q.toString(),{credentials:'include'});
+      if(r.status===401){ location.href='login.html'; return; }
+      if(!r.ok){ throw new Error(await r.text()||'Erro ao buscar diários'); }
+      let diarios=await r.json();
+      if(!Array.isArray(diarios)) diarios=[];
 
-      if (respFetch.status === 401) {
-        window.location.href = 'login.html';
-        return;
+      // ----- Filtros NO FRONT -----
+      // obra/responsável novamente para garantir (case-insensitive)
+      if(obra){
+        const t=obra.toLowerCase();
+        diarios=diarios.filter(d=>(d.obra||'').toLowerCase().includes(t));
+      }
+      if(resp){
+        const t=resp.toLowerCase();
+        diarios=diarios.filter(d=>(d.responsavel||'').toLowerCase().includes(t));
       }
 
-      if (!respFetch.ok) {
-        const t = await respFetch.text();
-        throw new Error(t || 'Erro ao buscar diários');
-      }
-
-      let diarios = await respFetch.json();
-      if (!Array.isArray(diarios)) diarios = [];
-
-      // ---- FILTRO POR CÓDIGO DE INTERCORRÊNCIA (NO FRONT) ----
-      if (cod) {
-        diarios = diarios.filter(d =>
-          Array.isArray(d.intercorrencias) &&
-          d.intercorrencias.some(i => String(i.codigo || '').trim() === cod)
-        );
-      }
-
-      // ---- BUSCA LIVRE (NO FRONT, CASO BACK NÃO FAÇA) ----
-      if (txt) {
-        const termo = txt.toLowerCase();
-        diarios = diarios.filter(d => {
-          let hit = false;
-          if ((d.observacoes || '').toLowerCase().includes(termo)) hit = true;
-          if (Array.isArray(d.intercorrencias)) {
-            if (d.intercorrencias.some(i =>
-              ((i.descricao || '') + ' ' + String(i.codigo || ''))
-                .toLowerCase()
-                .includes(termo)
-            )) hit = true;
-          }
-          return hit;
+      // datas
+      const dtDe  = dataDe  ? new Date(`${dataDe}T00:00:00`) : null;
+      const dtAte = dataAte ? new Date(`${dataAte}T23:59:59`) : null;
+      if(dtDe || dtAte){
+        diarios=diarios.filter(d=>{
+          const dd=getDateObjFromDiario(d);
+          if(!dd) return false;
+          if(dtDe  && dd<dtDe)  return false;
+          if(dtAte && dd>dtAte) return false;
+          return true;
         });
       }
 
-      if (!diarios.length) {
-        empty.style.display = 'block';
-        return;
+      // código de intercorrência
+      if(cod){
+        diarios=diarios.filter(d =>
+          Array.isArray(d.intercorrencias) &&
+          d.intercorrencias.some(i => String(i.codigo||'').trim()===cod)
+        );
       }
 
-      diarios.forEach(diario => {
-        const tr = document.createElement('tr');
-        const totais = calcularTotais(diario);
-        const dataBr = diario.dataBr || formatarDataIsoParaBr(diario.data);
+      // busca livre
+      if(txt){
+        const t=txt.toLowerCase();
+        diarios=diarios.filter(d=>{
+          if((d.obra||'').toLowerCase().includes(t)) return true;
+          if((d.responsavel||'').toLowerCase().includes(t)) return true;
+          if((d.observacoes||'').toLowerCase().includes(t)) return true;
+          if(Array.isArray(d.intercorrencias)){
+            if(d.intercorrencias.some(i =>
+              ((i.descricao||'')+' '+String(i.codigo||'')).toLowerCase().includes(t)
+            )) return true;
+          }
+          return false;
+        });
+      }
+      // ----- Fim filtros -----
 
-        tr.innerHTML = `
-          <td>${dataBr || ''}</td>
-          <td>${diario.obra || ''}</td>
-          <td>${diario.responsavel || ''}</td>
-          <td><span class="badge">${totais.presentes}</span></td>
-          <td><span class="badge">${totais.ausentes}</span></td>
-          <td><span class="badge">${totais.ferias}</span></td>
-          <td>
-            <button class="link" data-id="${diario.id}">Ver detalhes</button>
-          </td>
+      if(!diarios.length){ empty.style.display='block'; return; }
+
+      diarios.forEach(d=>{
+        const tr=document.createElement('tr');
+        const tot=calcularTotais(d);
+        const dataBr=d.dataBr || formatarDataIsoParaBr(d.data);
+        tr.innerHTML=`
+          <td>${dataBr||''}</td>
+          <td>${d.obra||''}</td>
+          <td>${d.responsavel||''}</td>
+          <td><span class="badge">${tot.presentes}</span></td>
+          <td><span class="badge">${tot.ausentes}</span></td>
+          <td><span class="badge">${tot.ferias}</span></td>
+          <td><button class="link" data-id="${d.id}">Ver detalhes</button></td>
         `;
         tbody.appendChild(tr);
       });
 
-      tbody.querySelectorAll('button.link').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-id');
-          if (id) {
-            window.location.href = `details.html?id=${encodeURIComponent(id)}`;
-          }
+      tbody.querySelectorAll('button.link').forEach(b=>{
+        b.addEventListener('click',()=> {
+          const id=b.getAttribute('data-id');
+          if(id) location.href=`details.html?id=${encodeURIComponent(id)}`;
         });
       });
 
-    } catch (err) {
-      console.error(err);
-      errorBox.textContent = 'Erro ao carregar diários. Tente novamente.';
-      errorBox.style.display = 'block';
+    }catch(e){
+      console.error(e);
+      error.textContent='Erro ao carregar diários. Tente novamente.';
+      error.style.display='block';
     }
   }
 
-  function limparFiltros() {
-    document.getElementById('fObra').value = '';
-    document.getElementById('fResp').value = '';
-    document.getElementById('fDataDe').value = '';
-    document.getElementById('fDataAte').value = '';
-    document.getElementById('fCodigoInter').value = '';
-    document.getElementById('fBuscaLivre').value = '';
+  function limparFiltros(){
+    document.getElementById('fObra').value='';
+    document.getElementById('fResp').value='';
+    document.getElementById('fDataDe').value='';
+    document.getElementById('fDataAte').value='';
+    document.getElementById('fCodigoInter').value='';
+    document.getElementById('fBuscaLivre').value='';
     carregarDiarios();
   }
 
-  // ---------- INIT ----------
-  window.addEventListener('DOMContentLoaded', () => {
+  // --------- Init
+  window.addEventListener('DOMContentLoaded',()=>{
     carregarUsuario();
     carregarDiarios();
 
-    document.getElementById('btnBuscar')
-      .addEventListener('click', carregarDiarios);
-
-    document.getElementById('btnLimpar')
-      .addEventListener('click', limparFiltros);
-
-    document.getElementById('btnLogout')
-      .addEventListener('click', logout);
+    document.getElementById('btnBuscar').addEventListener('click',carregarDiarios);
+    document.getElementById('btnLimpar').addEventListener('click',limparFiltros);
+    document.getElementById('btnLogout').addEventListener('click',logout);
   });
 </script>
 </body>
