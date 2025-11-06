@@ -1,168 +1,445 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin • Usuários</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin - Usuários Diário de Obra</title>
 <style>
-  :root{ --prim:#3A6385; --muted:#6b7a8c; --line:#e6ebf1; --bg:#f4f6f9; }
+  :root {
+    --prim:#3A6385;
+    --muted:#66758a;
+    --ok:#1b8a5a;
+    --warn:#c0392b;
+    --bg:#f4f6f9;
+  }
   *{ box-sizing:border-box; }
-  body{ margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#223; }
-  header{ background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.06); padding:16px; position:sticky; top:0; z-index:10; }
-  .wrap{ max-width:1100px; margin:0 auto; }
-  h1{ margin:0 0 4px; font-size:20px; }
-  .sub{ color:var(--muted); font-size:13px; }
-  .actions{ display:flex; gap:8px; align-items:center; }
-  .btn{ padding:8px 12px; border-radius:8px; border:0; cursor:pointer; font-size:13px; }
-  .btn.primary{ background:var(--prim); color:#fff; }
-  .btn.ghost{ background:#eef2f6; color:#223; }
-  main{ max-width:1100px; margin:18px auto; padding:0 16px 24px; }
-  .card{ background:#fff; border-radius:12px; box-shadow:0 10px 28px rgba(0,0,0,.08); padding:16px; margin-bottom:16px; }
-  table{ width:100%; border-collapse:collapse; }
-  th,td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; text-align:left; }
-  th{ background:#f9fbff; }
-  .small{ font-size:12px; color:#6b7a8c; }
-  .tag{ padding:2px 8px; border-radius:999px; background:#eef2f6; font-size:12px; }
-  .tag.admin{ background:#ffe7c2; }
-  .tag.off{ background:#fdecea; color:#b13; }
-  form.inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  input,select{ padding:8px 10px; border:1px solid #cfd6df; border-radius:8px; outline:none; font-size:14px; }
-  input:focus,select:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
+  body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:var(--bg);
+    color:#233;
+  }
+  header{
+    background:#fff;
+    padding:12px 20px;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  header h1{
+    margin:0;
+    font-size:18px;
+    color:#333;
+  }
+  header .info{
+    font-size:13px;
+    color:var(--muted);
+  }
+  header .actions{
+    display:flex;
+    gap:8px;
+  }
+  .btn{
+    border:none;
+    border-radius:8px;
+    padding:7px 12px;
+    font-size:13px;
+    cursor:pointer;
+    background:var(--prim);
+    color:#fff;
+  }
+  .btn.ghost{
+    background:#eef2f6;
+    color:#333;
+  }
+  .btn.danger{
+    background:#c0392b;
+    color:#fff;
+  }
+  .btn:hover{ filter:brightness(.96); }
+
+  main{
+    max-width:1000px;
+    margin:18px auto 24px;
+    padding:0 16px;
+  }
+  .card{
+    background:#fff;
+    border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);
+    padding:16px 18px 14px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    margin:0 0 8px;
+    font-size:17px;
+    color:#333;
+  }
+  .card p{
+    margin:0 0 10px;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .field{
+    flex:1 1 180px;
+    min-width:160px;
+    font-size:13px;
+  }
+  .field label{
+    display:block;
+    margin-bottom:3px;
+    color:#444;
+  }
+  .field input,
+  .field select{
+    width:100%;
+    padding:7px 9px;
+    border-radius:6px;
+    border:1px solid #cfd6df;
+    font-size:13px;
+    outline:none;
+  }
+  .field input:focus,
+  .field select:focus{
+    border-color:var(--prim);
+    box-shadow:0 0 0 2px rgba(58,99,133,.16);
+  }
+  .card-footer{
+    margin-top:10px;
+    display:flex;
+    justify-content:flex-end;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  th,td{
+    border:1px solid #e1e5ee;
+    padding:6px 6px;
+    text-align:left;
+  }
+  thead th{
+    background:var(--prim);
+    color:#fff;
+  }
+  tbody tr:nth-child(even){
+    background:#f8fafc;
+  }
+  .pill{
+    padding:3px 7px;
+    border-radius:999px;
+    font-size:11px;
+  }
+  .pill.ok{
+    background:#eaf7f0;
+    color:var(--ok);
+    border:1px solid #cdeedd;
+  }
+  .pill.warn{
+    background:#fdecea;
+    color:var(--warn);
+    border:1px solid #f7c6c1;
+  }
+  .small{
+    font-size:11px;
+    color:var(--muted);
+  }
+  .msg{
+    margin-top:8px;
+    font-size:13px;
+    min-height:18px;
+  }
+  .msg.ok{ color:var(--ok); }
+  .msg.err{ color:var(--warn); }
+  @media (max-width:700px){
+    header{
+      flex-direction:column;
+      align-items:flex-start;
+      gap:6px;
+    }
+    header .actions{
+      align-self:stretch;
+      justify-content:flex-start;
+      flex-wrap:wrap;
+    }
+    table{
+      font-size:12px;
+    }
+  }
 </style>
 </head>
 <body>
 <header>
-  <div class="wrap">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <div>
-        <h1>Admin • Gestão de Usuários</h1>
-        <div class="sub">Crie, altere e (des)ative logins de acesso</div>
-      </div>
-      <div class="actions">
-        <a class="btn ghost" href="/viewer.html">Ir para Curadoria</a>
-        <button id="logout" class="btn ghost">Sair</button>
-      </div>
-    </div>
+  <div>
+    <h1>Admin • Gestão de Usuários</h1>
+    <div class="info" id="userInfo">Carregando usuário...</div>
+  </div>
+  <div class="actions">
+    <button class="btn ghost" id="btnViewer">Ir para Viewer</button>
+    <button class="btn danger" id="btnLogout">Sair</button>
   </div>
 </header>
 
 <main>
-  <div class="wrap">
-    <div class="card">
-      <h2 style="margin:0 0 10px;">Novo usuário</h2>
-      <form id="fNew" class="inline">
-        <input name="username" placeholder="Usuário" required>
-        <input name="password" placeholder="Senha inicial" required>
-        <select name="role">
+  <section class="card">
+    <h2>Novo usuário</h2>
+    <p>Crie um usuário para acessar o sistema. Você pode escolher o perfil: <strong>admin</strong>, <strong>engenheiro</strong> ou <strong>user</strong>.</p>
+    <div class="row">
+      <div class="field">
+        <label for="novoEmail">E-mail (login)</label>
+        <input type="email" id="novoEmail" placeholder="ex: fulano@obra.local">
+      </div>
+      <div class="field">
+        <label for="novoSenha">Senha</label>
+        <input type="text" id="novoSenha" placeholder="Senha inicial">
+      </div>
+      <div class="field">
+        <label for="novoPerfil">Perfil</label>
+        <select id="novoPerfil">
+          <option value="user">user</option>
           <option value="engenheiro">engenheiro</option>
           <option value="admin">admin</option>
         </select>
-        <button class="btn primary" type="submit">Criar</button>
-        <span class="small">Dica: crie logins por engenheiro e troque a senha no primeiro acesso.</span>
-      </form>
+      </div>
     </div>
+    <div class="card-footer">
+      <button class="btn" id="btnCriar">Criar usuário</button>
+    </div>
+    <div id="msgNovo" class="msg"></div>
+  </section>
 
-    <div class="card">
-      <h2 style="margin:0 0 10px;">Usuários</h2>
+  <section class="card">
+    <h2>Usuários cadastrados</h2>
+    <p>Altere o perfil, ative/desative usuários ou redefina senhas.</p>
+    <div class="small" id="statusLista">Carregando lista...</div>
+    <div style="overflow-x:auto; margin-top:8px;">
       <table>
         <thead>
-          <tr><th>Usuário</th><th>Perfil</th><th>Status</th><th>Criado em</th><th style="width:40%">Ações</th></tr>
+          <tr>
+            <th style="width:26px;">ID</th>
+            <th>E-mail</th>
+            <th style="width:110px;">Perfil</th>
+            <th style="width:80px;">Ativo</th>
+            <th style="width:140px;">Criado em</th>
+            <th style="width:170px;">Nova Senha</th>
+            <th style="width:120px;">Ações</th>
+          </tr>
         </thead>
-        <tbody id="tbody"><tr><td colspan="5" class="small">Carregando…</td></tr></tbody>
+        <tbody id="tbodyUsers"></tbody>
       </table>
     </div>
-  </div>
+  </section>
 </main>
 
 <script>
-const API = location.origin;
+  const API = '';
 
-async function ensureAdmin(){
-  const r = await fetch(`${API}/api/me`, {credentials:'include'});
-  if (r.status===401) { location.href='/login.html'; return false; }
-  const j = await r.json();
-  if (j.user?.role!=='admin') { alert('Acesso restrito a administradores.'); location.href='/viewer.html'; return false; }
-  return true;
-}
+  const userInfoEl = document.getElementById('userInfo');
+  const statusLista = document.getElementById('statusLista');
+  const tbodyUsers = document.getElementById('tbodyUsers');
+  const msgNovo = document.getElementById('msgNovo');
 
-document.getElementById('logout').addEventListener('click', async ()=>{
-  await fetch(`${API}/api/logout`, {method:'POST', credentials:'include'});
-  location.href='/login.html';
-});
+  document.getElementById('btnViewer').addEventListener('click', ()=>{
+    window.location.href = 'viewer.html';
+  });
+  document.getElementById('btnLogout').addEventListener('click', async ()=>{
+    try{
+      await fetch(`${API}/api/logout`, { method:'POST' });
+    }catch(e){}
+    window.location.href = 'login.html';
+  });
 
-function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
+  async function carregarMe(){
+    try{
+      const resp = await fetch(`${API}/api/me`);
+      if(!resp.ok){
+        userInfoEl.textContent = 'Sessão inválida.';
+        window.location.href = 'login.html';
+        return;
+      }
+      const data = await resp.json();
+      if(!data.user){
+        userInfoEl.textContent = 'Não autenticado.';
+        window.location.href = 'login.html';
+        return;
+      }
+      userInfoEl.textContent = `${data.user.email} (${data.user.perfil})`;
+    }catch(err){
+      console.error(err);
+      userInfoEl.textContent = 'Erro ao carregar usuário.';
+    }
+  }
 
-async function listUsers(){
-  const r = await fetch(`${API}/api/users`, {credentials:'include'});
-  if(!r.ok){ alert('Falha ao listar usuários'); return; }
-  const rows = await r.json();
-  const tb = document.getElementById('tbody'); tb.innerHTML='';
-  if(!rows.length){ tb.innerHTML='<tr><td colspan="5" class="small">Nenhum usuário.</td></tr>'; return; }
-  rows.forEach(u=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${esc(u.username)}</td>
-      <td><span class="tag ${u.role==='admin'?'admin':''}">${u.role}</span></td>
-      <td>${u.active? 'ativo' : '<span class="tag off">inativo</span>'}</td>
-      <td class="small">${esc(u.created_at||'—')}</td>
-      <td>
-        <form data-id="${u.id}" class="inline fEdit">
-          <input name="password" placeholder="Nova senha" style="min-width:140px">
-          <select name="role">
-            <option value="engenheiro" ${u.role==='engenheiro'?'selected':''}>engenheiro</option>
-            <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
+  function desenharUsuarios(lista){
+    tbodyUsers.innerHTML = '';
+    if(!lista || !lista.length){
+      statusLista.textContent = 'Nenhum usuário cadastrado.';
+      return;
+    }
+    statusLista.textContent = `Total de usuários: ${lista.length}`;
+
+    for(const u of lista){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${u.id}</td>
+        <td>${u.email}</td>
+        <td>
+          <select data-role="perfil">
+            <option value="user" ${u.perfil === 'user' ? 'selected' : ''}>user</option>
+            <option value="engenheiro" ${u.perfil === 'engenheiro' ? 'selected' : ''}>engenheiro</option>
+            <option value="admin" ${u.perfil === 'admin' ? 'selected' : ''}>admin</option>
           </select>
-          <input name="username" placeholder="Trocar usuário" value="${esc(u.username)}" style="min-width:140px">
-          <button class="btn primary" type="submit">Salvar</button>
-          <button class="btn ghost toggle" type="button">${u.active?'Desativar':'Reativar'}</button>
-        </form>
-      </td>
-    `;
-    tb.appendChild(tr);
+        </td>
+        <td style="text-align:center;">
+          <select data-role="ativo">
+            <option value="1" ${u.ativo ? 'selected' : ''}>Ativo</option>
+            <option value="0" ${!u.ativo ? 'selected' : ''}>Inativo</option>
+          </select>
+        </td>
+        <td>${u.criado_em || ''}</td>
+        <td>
+          <input type="text" data-role="novaSenha" placeholder="Nova senha" style="width:100%; font-size:12px; padding:5px 6px;">
+        </td>
+        <td>
+          <button class="btn" data-action="salvar" style="margin-bottom:4px; width:100%;">Salvar</button>
+          <button class="btn ghost" data-action="reset" style="width:100%;">Aplicar senha</button>
+        </td>
+      `;
+      tr.dataset.id = u.id;
+      tbodyUsers.appendChild(tr);
+    }
+  }
+
+  async function carregarUsuarios(){
+    statusLista.textContent = 'Carregando lista...';
+    tbodyUsers.innerHTML = '';
+    try{
+      const resp = await fetch(`${API}/api/users`);
+      if(resp.status === 401){
+        alert('Sessão expirada. Faça login novamente.');
+        window.location.href = 'login.html';
+        return;
+      }
+      const data = await resp.json();
+      if(!resp.ok){
+        statusLista.textContent = data.error || 'Erro ao carregar usuários.';
+        return;
+      }
+      desenharUsuarios(data.users || []);
+    }catch(err){
+      console.error(err);
+      statusLista.textContent = 'Erro ao conectar ao servidor.';
+    }
+  }
+
+  document.getElementById('btnCriar').addEventListener('click', async ()=>{
+    msgNovo.textContent = '';
+    msgNovo.className = 'msg';
+
+    const email = document.getElementById('novoEmail').value.trim();
+    const senha = document.getElementById('novoSenha').value.trim();
+    const perfil = document.getElementById('novoPerfil').value;
+
+    if(!email || !senha){
+      msgNovo.textContent = 'Preencha e-mail e senha.';
+      msgNovo.classList.add('err');
+      return;
+    }
+
+    try{
+      const resp = await fetch(`${API}/api/users`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email, senha, perfil })
+      });
+      const data = await resp.json();
+      if(!resp.ok){
+        msgNovo.textContent = data.error || 'Erro ao criar usuário.';
+        msgNovo.classList.add('err');
+        return;
+      }
+      msgNovo.textContent = 'Usuário criado com sucesso.';
+      msgNovo.classList.add('ok');
+      document.getElementById('novoEmail').value = '';
+      document.getElementById('novoSenha').value = '';
+      document.getElementById('novoPerfil').value = 'user';
+      carregarUsuarios();
+    }catch(err){
+      console.error(err);
+      msgNovo.textContent = 'Erro de conexão.';
+      msgNovo.classList.add('err');
+    }
   });
-}
 
-document.getElementById('fNew').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target).entries());
-  const r = await fetch(`${API}/api/users`, {
-    method:'POST', credentials:'include',
-    headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+  tbodyUsers.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+
+    const tr = btn.closest('tr');
+    const id = tr.dataset.id;
+    const action = btn.getAttribute('data-action');
+
+    if(action === 'salvar'){
+      const perfilSel = tr.querySelector('select[data-role="perfil"]').value;
+      const ativoSel = tr.querySelector('select[data-role="ativo"]').value === '1';
+
+      try{
+        const resp = await fetch(`${API}/api/users/${id}`, {
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ perfil: perfilSel, ativo: ativoSel })
+        });
+        const data = await resp.json();
+        if(!resp.ok){
+          alert(data.error || 'Erro ao salvar usuário.');
+          return;
+        }
+        alert('Usuário atualizado com sucesso.');
+        carregarUsuarios();
+      }catch(err){
+        console.error(err);
+        alert('Erro de conexão ao salvar usuário.');
+      }
+    }
+
+    if(action === 'reset'){
+      const novaSenha = tr.querySelector('input[data-role="novaSenha"]').value.trim();
+      if(!novaSenha){
+        alert('Informe a nova senha.');
+        return;
+      }
+      try{
+        const resp = await fetch(`${API}/api/users/${id}/reset-password`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ novaSenha })
+        });
+        const data = await resp.json();
+        if(!resp.ok){
+          alert(data.error || 'Erro ao redefinir senha.');
+          return;
+        }
+        alert('Senha atualizada com sucesso.');
+        tr.querySelector('input[data-role="novaSenha"]').value = '';
+      }catch(err){
+        console.error(err);
+        alert('Erro de conexão ao redefinir senha.');
+      }
+    }
   });
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok){ alert(j.error||'Erro ao criar'); return; }
-  e.target.reset();
-  listUsers();
-});
 
-document.getElementById('tbody').addEventListener('submit', async (e)=>{
-  if (!e.target.classList.contains('fEdit')) return;
-  e.preventDefault();
-  const id = e.target.dataset.id;
-  const data = Object.fromEntries(new FormData(e.target).entries());
-  const r = await fetch(`${API}/api/users/${id}`, {
-    method:'PATCH', credentials:'include',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(data)
+  window.addEventListener('DOMContentLoaded', async ()=>{
+    await carregarMe();
+    await carregarUsuarios();
   });
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok){ alert(j.error||'Erro ao salvar'); return; }
-  listUsers();
-});
-
-document.getElementById('tbody').addEventListener('click', async (e)=>{
-  const btn = e.target.closest('.toggle'); if(!btn) return;
-  const form = btn.closest('form'); const id = form.dataset.id;
-  const r = await fetch(`${API}/api/users/${id}/toggle-active`, { method:'POST', credentials:'include' });
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok){ alert(j.error||'Erro ao alternar status'); return; }
-  listUsers();
-});
-
-window.addEventListener('DOMContentLoaded', async ()=>{
-  const ok = await ensureAdmin(); if(!ok) return;
-  listUsers();
-});
 </script>
 </body>
 </html>
