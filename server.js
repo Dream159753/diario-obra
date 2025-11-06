@@ -1,399 +1,457 @@
+// server.js
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const session = require('express-session');
-const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
-const { parse } = require('csv-parse/sync');
-
-const PORT = process.env.PORT || 10000;
-const DB_FILE = process.env.DB_FILE || 'diario_obra.db';
-const FUNCIONARIOS_GLOB = /^funcionarios.*\.csv$/i;
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// ---------- MIDDLEWARE BÁSICO ----------
-app.use(express.json({ limit: '2mb' }));
+// ------------------------------------------------------
+// MIDDLEWARE BÁSICO
+// ------------------------------------------------------
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'diario-obra-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 8 // 8 horas
+    }
+  })
+);
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'diario-obra-super-secreto',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 8 // 8 horas
-  }
-}));
-
-// servir arquivos estáticos (HTML + assets da pasta atual)
+// arquivos estáticos (html, css, js, csv, etc)
 app.use(express.static(path.join(__dirname)));
 
-// ---------- BANCO DE DADOS ----------
-const db = new Database(DB_FILE);
+// ------------------------------------------------------
+// BANCO DE DADOS (better-sqlite3)
+// ------------------------------------------------------
+const dbPath = path.join(__dirname, 'diario_obra.db');
+const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
 
-// cria tabelas se não existirem
 db.exec(`
   CREATE TABLE IF NOT EXISTS usuarios (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    email       TEXT NOT NULL UNIQUE,
-    senha_hash  TEXT NOT NULL,
-    perfil      TEXT NOT NULL DEFAULT 'user', -- admin | engenheiro | user
-    ativo       INTEGER NOT NULL DEFAULT 1,
-    criado_em   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    email     TEXT UNIQUE NOT NULL,
+    senha     TEXT NOT NULL,
+    perfil    TEXT NOT NULL CHECK (perfil IN ('admin','engenheiro','user')),
+    ativo     INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS diarios (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    data            TEXT NOT NULL,
-    obra            TEXT NOT NULL,
-    responsavel     TEXT NOT NULL,
-    observacoes     TEXT,
-    funcoes_json    TEXT NOT NULL,
-    ausentes_json   TEXT NOT NULL,
-    interc_json     TEXT NOT NULL,
-    criado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    data        TEXT NOT NULL,
+    obra        TEXT NOT NULL,
+    responsavel TEXT NOT NULL,
+    observacoes TEXT,
+    payload     TEXT NOT NULL,
+    criado_em   TEXT NOT NULL
   );
 `);
 
-// ---------- SEED / CORREÇÃO DE USUÁRIOS PADRÃO ----------
+// ------------------------------------------------------
+// SEED DE USUÁRIOS
+// ------------------------------------------------------
 function seedUser(email, senha, perfil) {
-  const existente = db.prepare('SELECT id, perfil, ativo FROM usuarios WHERE email = ?').get(email);
+  const exists = db
+    .prepare('SELECT id FROM usuarios WHERE email = ?')
+    .get(email);
 
-  if (!existente) {
-    const hash = bcrypt.hashSync(senha, 10);
+  if (!exists) {
+    const now = new Date().toISOString();
     db.prepare(
-      'INSERT INTO usuarios (email, senha_hash, perfil, ativo) VALUES (?, ?, ?, 1)'
-    ).run(email, hash, perfil);
-    console.log(`Seed user criado: ${email} / ${senha} (${perfil})`);
-  } else {
-    // Garante perfil correto e ativo=1 (não mexe na senha)
-    db.prepare('UPDATE usuarios SET perfil = ?, ativo = 1 WHERE id = ?')
-      .run(perfil, existente.id);
-    console.log(`Seed user ajustado: ${email} -> perfil=${perfil}, ativo=1`);
+      'INSERT INTO usuarios (email, senha, perfil, ativo, criado_em) VALUES (?,?,?,?,?)'
+    ).run(email, senha, perfil, 1, now);
+    console.log(
+      `Seed user criado: ${email} / ${senha} (${perfil})`
+    );
   }
 }
 
-seedUser('admin@obra.local',      'admin123', 'admin');
-seedUser('engenheiro@obra.local', '123456',   'engenheiro');
+seedUser('admin@obra.local', 'admin123', 'admin');
+seedUser('engenheiro@obra.local', '123456', 'engenheiro');
 
-// ---------- AUTENTICAÇÃO / SESSÃO ----------
-function requireLogin(req, res, next) {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Não autenticado' });
-  }
+// ------------------------------------------------------
+// CARREGAR FUNCIONÁRIOS DO CSV
+// ------------------------------------------------------
+const funcionarios = {};
 
+function carregarFuncionarios() {
   try {
-    const user = db
-      .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
-      .get(req.session.userId);
-
-    if (!user || !user.ativo) {
-      return res.status(401).json({ error: 'Sessão inválida.' });
+    const csvPath = path.join(__dirname, 'funcionarios.csv');
+    if (!fs.existsSync(csvPath)) {
+      console.log(
+        `Nenhum arquivo funcionarios.csv encontrado na pasta ${__dirname}.`
+      );
+      return;
     }
 
-    req.session.perfil = user.perfil;
-    next();
+    const raw = fs.readFileSync(csvPath, 'utf8');
+    const linhas = raw.split(/\r?\n/).filter((l) => l.trim());
+    if (linhas.length <= 1) return;
+
+    const headerLine = linhas[0];
+    const sep = headerLine.includes(';') ? ';' : ',';
+    const headers = headerLine
+      .split(sep)
+      .map((h) => h.trim().toLowerCase());
+
+    const idxChapa = headers.indexOf('chapa');
+    const idxNome = headers.indexOf('nome');
+    const idxFunc = headers.indexOf('funcao');
+
+    if (idxChapa === -1 || idxNome === -1 || idxFunc === -1) {
+      console.log(
+        'Cabeçalho do funcionarios.csv não contém chapa/nome/funcao'
+      );
+      return;
+    }
+
+    for (let i = 1; i < linhas.length; i++) {
+      const cols = linhas[i].split(sep);
+      const chapa = (cols[idxChapa] || '').trim();
+      const nome = (cols[idxNome] || '').trim();
+      const funcao = (cols[idxFunc] || '').trim();
+
+      if (!chapa) continue;
+      funcionarios[chapa] = { chapa, nome, funcao };
+    }
+
+    console.log(
+      `Carregados ${Object.keys(funcionarios).length} funcionários de ${csvPath}`
+    );
   } catch (err) {
-    console.error('Erro em requireLogin:', err);
-    return res.status(500).json({ error: 'Erro de sessão.' });
+    console.error('Erro ao carregar funcionarios.csv:', err);
   }
 }
 
-// (Deixei aqui se um dia quiser voltar a travar pelo backend)
+carregarFuncionarios();
+
+// ------------------------------------------------------
+// HELPERS DE AUTENTICAÇÃO
+// ------------------------------------------------------
+function requireAuth(req, res, next) {
+  if (req.session && req.session.user) return next();
+  return res.status(401).json({ error: 'Não autenticado' });
+}
+
 function requireAdmin(req, res, next) {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Não autenticado' });
-  }
-  try {
-    const user = db
-      .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
-      .get(req.session.userId);
-
-    if (!user || !user.ativo || user.perfil !== 'admin') {
-      return res.status(403).json({ error: 'Acesso negado' });
-    }
-
-    req.session.perfil = user.perfil;
-    next();
-  } catch (err) {
-    console.error('Erro em requireAdmin:', err);
-    return res.status(500).json({ error: 'Erro de sessão.' });
-  }
+  if (req.session?.user?.perfil === 'admin') return next();
+  return res
+    .status(403)
+    .json({ error: 'Acesso restrito a administradores.' });
 }
 
-// rota de login
+// ------------------------------------------------------
+// ROTAS ABERTAS (NÃO PRECISAM DE LOGIN)
+// ------------------------------------------------------
+
+// LOGIN
 app.post('/api/login', (req, res) => {
-  const { email, usuario, senha } = req.body || {};
-
-  const loginEmail = (email || usuario || '').trim();
-  const senhaStr   = (senha || '').toString();
-
-  if (!loginEmail || !senhaStr) {
-    return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+  const { email, senha } = req.body || {};
+  if (!email || !senha) {
+    return res
+      .status(400)
+      .json({ error: 'Usuário e senha são obrigatórios.' });
   }
 
-  try {
-    const user = db
-      .prepare('SELECT id, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ?')
-      .get(loginEmail);
+  const user = db
+    .prepare(
+      'SELECT id, email, senha, perfil, ativo FROM usuarios WHERE email = ?'
+    )
+    .get(email);
 
-    if (!user || !user.ativo) {
-      return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
-    }
-
-    const ok = bcrypt.compareSync(senhaStr, user.senha_hash);
-    if (!ok) {
-      return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
-    }
-
-    req.session.userId = user.id;
-    req.session.perfil = user.perfil;
-
-    return res.json({ ok: true, perfil: user.perfil });
-  } catch (err) {
-    console.error('Erro no login:', err);
-    return res.status(500).json({ error: 'Erro ao efetuar login.' });
+  if (!user || !user.ativo || user.senha !== senha) {
+    return res
+      .status(400)
+      .json({ error: 'Usuário ou senha inválidos.' });
   }
+
+  req.session.user = {
+    id: user.id,
+    email: user.email,
+    perfil: user.perfil
+  };
+
+  res.json({
+    ok: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      perfil: user.perfil
+    }
+  });
 });
 
+// LOGOUT
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => {
     res.json({ ok: true });
   });
 });
 
+// /api/me – pode ser público, só retorna null se não tiver login
 app.get('/api/me', (req, res) => {
-  if (!req.session.userId) {
-    return res.json({ user: null });
-  }
-  const user = db
-    .prepare('SELECT id, email, perfil, ativo, criado_em FROM usuarios WHERE id = ?')
-    .get(req.session.userId);
-  if (!user || !user.ativo) {
-    return res.json({ user: null });
-  }
-  res.json({ user });
+  res.json({ user: req.session.user || null });
 });
 
-// ---------- ADMIN: USUÁRIOS ----------
-// ⚠️ AGORA SÓ EXIGE LOGIN (admin ou engenheiro); o admin.html decide quem vê o quê.
-app.get('/api/users', requireLogin, (req, res) => {
-  try {
-    const rows = db.prepare('SELECT id, email, perfil, ativo, criado_em FROM usuarios ORDER BY id').all();
-    res.json({ users: rows });
-  } catch (err) {
-    console.error('Erro /api/users:', err);
-    res.status(500).json({ error: 'Erro ao listar usuários.' });
-  }
+// FUNCIONÁRIOS – AUTOCOMPLETE POR CHAPA/NOME
+app.get('/api/funcionarios', (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+
+  const qLower = q.toLowerCase();
+  const todos = Object.values(funcionarios);
+
+  const resultado = todos
+    .filter(
+      (f) =>
+        f.chapa.startsWith(q) ||
+        f.nome.toLowerCase().includes(qLower)
+    )
+    .slice(0, 20);
+
+  res.json(resultado);
 });
 
-app.post('/api/users', requireLogin, (req, res) => {
-  const { email, senha, perfil } = req.body || {};
-  if (!email || !senha || !perfil) {
-    return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
-  }
-  try {
-    const hash = bcrypt.hashSync(senha.toString(), 10);
-    const info = db
-      .prepare('INSERT INTO usuarios (email, senha_hash, perfil, ativo) VALUES (?, ?, ?, 1)')
-      .run(email.trim(), hash, perfil);
-    res.json({ ok: true, id: info.lastInsertRowid });
-  } catch (err) {
-    console.error('Erro POST /api/users:', err);
-    if (String(err).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Já existe um usuário com este e-mail.' });
-    }
-    res.status(500).json({ error: 'Erro ao criar usuário.' });
-  }
+// FUNCIONÁRIO POR CHAPA
+app.get('/api/funcionarios/:chapa', (req, res) => {
+  const { chapa } = req.params;
+  const f = funcionarios[chapa];
+  if (!f) return res.status(404).json({ error: 'Não encontrado' });
+  res.json(f);
 });
 
-app.patch('/api/users/:id', requireLogin, (req, res) => {
-  const id = Number(req.params.id);
-  const { perfil, ativo } = req.body || {};
-  if (!id || !perfil || typeof ativo === 'undefined') {
-    return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
-  }
+// POST /api/diarios – LANÇAMENTO DO FORM (SEM LOGIN)
+app.post('/api/diarios', (req, res) => {
   try {
-    db.prepare('UPDATE usuarios SET perfil = ?, ativo = ? WHERE id = ?')
-      .run(perfil, ativo ? 1 : 0, id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro PATCH /api/users/:id', err);
-    res.status(500).json({ error: 'Erro ao atualizar usuário.' });
-  }
-});
+    const payload = req.body || {};
+    const { obra, responsavel, data, observacoes } = payload;
 
-app.post('/api/users/:id/reset-password', requireLogin, (req, res) => {
-  const id = Number(req.params.id);
-  const { novaSenha } = req.body || {};
-  if (!id || !novaSenha) {
-    return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
-  }
-  try {
-    const hash = bcrypt.hashSync(novaSenha.toString(), 10);
-    db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hash, id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro reset-password:', err);
-    res.status(500).json({ error: 'Erro ao trocar senha.' });
-  }
-});
-
-// ---------- FUNCIONÁRIOS (CSV) ----------
-let funcionariosIndex = new Map();
-
-function carregarFuncionarios() {
-  funcionariosIndex = new Map();
-  try {
-    const arquivos = fs.readdirSync(__dirname)
-      .filter(f => FUNCIONARIOS_GLOB.test(f));
-
-    if (!arquivos.length) {
-      console.log(`Nenhum arquivo funcionarios*.csv encontrado na pasta ${__dirname}.`);
-      return;
+    if (!obra || !responsavel || !data) {
+      return res
+        .status(400)
+        .json({ error: 'Campos obrigatórios faltando.' });
     }
 
-    const caminho = path.join(__dirname, arquivos[0]);
-    const conteudo = fs.readFileSync(caminho);
-    const registros = parse(conteudo, {
-      columns: true,
-      skip_empty_lines: true,
-      delimiter: ';'
-    });
-
-    for (const row of registros) {
-      const chapa = String(row.chapa || row.Chapa || '').trim();
-      const nome = String(row.nome || row.Nome || '').trim();
-      const funcao = String(row.funcao || row.funcao_simplificada || row.FUNCAO || '').trim();
-      if (!chapa) continue;
-      funcionariosIndex.set(chapa, {
-        chapa,
-        nome,
-        funcao
-      });
-    }
-
-    console.log(`Carregados ${funcionariosIndex.size} funcionários de ${caminho}`);
-  } catch (err) {
-    console.error('Erro ao carregar funcionarios CSV:', err);
-  }
-}
-
-carregarFuncionarios();
-
-app.get('/api/funcionarios/:chapa', requireLogin, (req, res) => {
-  const chapa = String(req.params.chapa || '').trim();
-  if (!chapa) return res.status(400).json({ error: 'Chapa obrigatória.' });
-
-  const func = funcionariosIndex.get(chapa);
-  if (!func) {
-    return res.status(404).json({ error: 'Funcionário não encontrado.' });
-  }
-  res.json(func);
-});
-
-app.get('/api/funcionarios', requireLogin, (req, res) => {
-  const q = String(req.query.q || '').trim();
-  if (!q) {
-    return res.json([]);
-  }
-  const termo = q.toLowerCase();
-  const out = [];
-  for (const f of funcionariosIndex.values()) {
-    if (f.chapa.includes(q) || (f.nome && f.nome.toLowerCase().includes(termo))) {
-      out.push(f);
-      if (out.length >= 20) break;
-    }
-  }
-  res.json(out);
-});
-
-// ---------- DIÁRIOS ----------
-app.post('/api/diarios', requireLogin, (req, res) => {
-  const { obra, responsavel, data, observacoes, funcoes, ausentes, intercorrencias } = req.body || {};
-
-  if (!obra || !responsavel || !data) {
-    return res.status(400).json({ error: 'Obra, responsável e data são obrigatórios.' });
-  }
-
-  // trava: pelo menos 1 intercorrência (pode ser código 0 = sem intercorrência)
-  if (!Array.isArray(intercorrencias) || intercorrencias.length === 0) {
-    return res.status(400).json({ error: 'Informe pelo menos uma intercorrência.' });
-  }
-
-  try {
-    const info = db.prepare(`
-      INSERT INTO diarios (obra, responsavel, data, observacoes, funcoes_json, ausentes_json, interc_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      obra.trim(),
-      responsavel.trim(),
+    const now = new Date().toISOString();
+    const stmt = db.prepare(
+      'INSERT INTO diarios (data, obra, responsavel, observacoes, payload, criado_em) VALUES (?,?,?,?,?,?)'
+    );
+    const info = stmt.run(
       data,
-      (observacoes || '').trim(),
-      JSON.stringify(funcoes || []),
-      JSON.stringify(ausentes || []),
-      JSON.stringify(intercorrencias || [])
+      obra,
+      responsavel,
+      observacoes || '',
+      JSON.stringify(payload),
+      now
     );
 
     res.json({ ok: true, id: info.lastInsertRowid });
   } catch (err) {
     console.error('Erro ao salvar diário:', err);
-    res.status(500).json({ error: 'Erro ao salvar diário.' });
+    res.status(500).json({ error: 'Falha ao salvar diário.' });
   }
 });
 
-app.get('/api/diarios', requireLogin, (req, res) => {
+// ------------------------------------------------------
+// A PARTIR DAQUI, TUDO EM /api PRECISA DE LOGIN
+// ------------------------------------------------------
+app.use('/api', requireAuth);
+
+// LISTAR USUÁRIOS (ADMIN)
+app.get('/api/users', requireAdmin, (req, res) => {
+  const rows = db
+    .prepare(
+      'SELECT id, email, perfil, ativo, criado_em FROM usuarios ORDER BY id'
+    )
+    .all();
+  res.json(rows);
+});
+
+// CRIAR NOVO USUÁRIO (ADMIN)
+app.post('/api/users', requireAdmin, (req, res) => {
+  const { email, senhaInicial, perfil } = req.body || {};
+  if (!email || !senhaInicial || !perfil) {
+    return res
+      .status(400)
+      .json({ error: 'Campos obrigatórios faltando.' });
+  }
+
   try {
-    const rows = db.prepare(`
-      SELECT id, obra, responsavel, data, observacoes, funcoes_json, ausentes_json, interc_json, criado_em
-      FROM diarios
-      ORDER BY data DESC, id DESC
-      LIMIT 500
-    `).all();
-
-    const parsed = rows.map(r => ({
-      id: r.id,
-      obra: r.obra,
-      responsavel: r.responsavel,
-      data: r.data,
-      observacoes: r.observacoes,
-      funcoes: JSON.parse(r.funcoes_json || '[]'),
-      ausentes: JSON.parse(r.ausentes_json || '[]'),
-      intercorrencias: JSON.parse(r.interc_json || '[]'),
-      criado_em: r.criado_em
-    }));
-
-    res.json({ diarios: parsed });
+    const now = new Date().toISOString();
+    const stmt = db.prepare(
+      'INSERT INTO usuarios (email, senha, perfil, ativo, criado_em) VALUES (?,?,?,?,?)'
+    );
+    const info = stmt.run(email, senhaInicial, perfil, 1, now);
+    res.json({
+      ok: true,
+      user: {
+        id: info.lastInsertRowid,
+        email,
+        perfil,
+        ativo: 1,
+        criado_em: now
+      }
+    });
   } catch (err) {
-    console.error('Erro /api/diarios:', err);
-    res.status(500).json({ error: 'Erro ao listar diários.' });
+    if (String(err.message).includes('UNIQUE')) {
+      return res
+        .status(400)
+        .json({ error: 'Já existe usuário com esse e-mail.' });
+    }
+    console.error('Erro ao criar usuário:', err);
+    res.status(500).json({ error: 'Falha ao criar usuário.' });
   }
 });
 
-// ---------- ROTAS DE PÁGINA SIMPLES ----------
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+// ATUALIZAR USUÁRIO (ADMIN) – PUT ou PATCH
+function handleUpdateUser(req, res) {
+  const { id } = req.params;
+  const { email, senhaNova, perfil, ativo } = req.body || {};
+  const user = db
+    .prepare('SELECT * FROM usuarios WHERE id = ?')
+    .get(id);
+  if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+  const updates = [];
+  const params = [];
+
+  if (email) {
+    updates.push('email = ?');
+    params.push(email);
+  }
+  if (senhaNova) {
+    updates.push('senha = ?');
+    params.push(senhaNova);
+  }
+  if (perfil) {
+    updates.push('perfil = ?');
+    params.push(perfil);
+  }
+  if (typeof ativo !== 'undefined') {
+    updates.push('ativo = ?');
+    params.push(ativo ? 1 : 0);
+  }
+
+  if (!updates.length) {
+    return res.json({ ok: true }); // nada a mudar
+  }
+
+  params.push(id);
+  const sql = `UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`;
+  db.prepare(sql).run(...params);
+
+  res.json({ ok: true });
+}
+
+app.put('/api/users/:id', requireAdmin, handleUpdateUser);
+app.patch('/api/users/:id', requireAdmin, handleUpdateUser);
+
+// BUSCAR DIÁRIOS (CURADORIA)
+app.get('/api/diarios', (req, res) => {
+  const { obra, responsavel, de, ate, codInter, texto } = req.query;
+
+  const rows = db
+    .prepare(
+      'SELECT id, data, obra, responsavel, observacoes, payload, criado_em FROM diarios ORDER BY data DESC, id DESC'
+    )
+    .all();
+
+  const cod = (codInter || '').trim();
+  const textoBusca = (texto || '').trim().toLowerCase();
+
+  const filtrados = rows.filter((row) => {
+    const p = JSON.parse(row.payload || '{}');
+
+    if (obra && !row.obra.toLowerCase().includes(obra.toLowerCase())) {
+      return false;
+    }
+    if (
+      responsavel &&
+      !row.responsavel
+        .toLowerCase()
+        .includes(responsavel.toLowerCase())
+    ) {
+      return false;
+    }
+    if (de && row.data < de) return false;
+    if (ate && row.data > ate) return false;
+
+    if (cod) {
+      const temCod = Array.isArray(p.intercorrencias)
+        ? p.intercorrencias.some(
+            (i) => String(i.codigo || '') === String(cod)
+          )
+        : false;
+      if (!temCod) return false;
+    }
+
+    if (textoBusca) {
+      const campo = (
+        row.observacoes ||
+        '' +
+          JSON.stringify(p.intercorrencias || []) +
+          JSON.stringify(p.ausentes || [])
+      ).toLowerCase();
+      if (!campo.includes(textoBusca)) return false;
+    }
+
+    return true;
+  });
+
+  const resumo = filtrados.map((row) => {
+    const p = JSON.parse(row.payload || '{}');
+    let presentes = 0;
+    let ausentes = 0;
+    let ferias = 0;
+
+    if (Array.isArray(p.funcoes)) {
+      for (const f of p.funcoes) {
+        presentes += Number(f.presente || 0);
+        ausentes += Number(f.ausente || 0);
+        ferias += Number(f.ferias || 0);
+      }
+    }
+
+    return {
+      id: row.id,
+      data: row.data,
+      obra: row.obra,
+      responsavel: row.responsavel,
+      presentes,
+      ausentes,
+      ferias
+    };
+  });
+
+  res.json(resumo);
 });
 
-app.get('/form', (req, res) => {
-  res.sendFile(path.join(__dirname, 'form.html'));
+// DETALHE DE UM DIÁRIO
+app.get('/api/diarios/:id', (req, res) => {
+  const { id } = req.params;
+  const row = db
+    .prepare(
+      'SELECT id, data, obra, responsavel, observacoes, payload, criado_em FROM diarios WHERE id = ?'
+    )
+    .get(id);
+
+  if (!row) return res.status(404).json({ error: 'Não encontrado.' });
+
+  const payload = JSON.parse(row.payload || '{}');
+  res.json({ ...row, ...payload });
 });
 
-app.get('/viewer', (req, res) => {
-  res.sendFile(path.join(__dirname, 'viewer.html'));
-});
-
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
-});
-
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'login.html'));
-});
-
-// ---------- START ----------
+// ------------------------------------------------------
+// START
+// ------------------------------------------------------
 app.listen(PORT, () => {
   console.log(`API rodando em http://localhost:${PORT}`);
 });
