@@ -87,7 +87,7 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <!-- TODAS AS FUNÇÕES (NÃO MEXER) -->
+        <!-- TODAS AS FUNÇÕES -->
         <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
@@ -169,24 +169,24 @@
 
 <script>
 /* ====== CONFIG API ====== */
-/* usa o mesmo domínio do backend (/api/...) */
-const API = '';
+/* aponta direto pro Render */
+const API = 'https://diario-obra.onrender.com';
 
-/* Catálogo (incluindo código 0 pedido) */
+/* Catálogo (inclui código 0) */
 const CATALOG = [
-  {code:0,  title:'Sem intercorrências',         model:'Não houve intercorrencias que afetam a produção.'},
-  {code:10, title:'Falta de material',           model:'Falta de material (especificar) das HH:MM às HH:MM.'},
-  {code:11, title:'Chuva intensa',               model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
-  {code:12, title:'Falta de energia',            model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
-  {code:15, title:'Grua quebrada',               model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
-  {code:16, title:'Interdição de área',          model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
-  {code:18, title:'Acidente/ocorrência',         model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
-  {code:19, title:'Fiscalização/Paralisação',    model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
-  {code:20, title:'Dúvida técnica/Projeto',      model:'Dúvida técnica de projeto (item) — aguardando definição.'},
-  {code:22, title:'Falta de água',               model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
-  {code:25, title:'Problema logístico/acesso',   model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
-  {code:26, title:'Vistoria externa',            model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação',          model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
+  {code:0,  title:'Sem intercorrências',       model:'Não houve intercorrencias que afetam a produção.'},
+  {code:10, title:'Falta de material',         model:'Falta de material (especificar) das HH:MM às HH:MM.'},
+  {code:11, title:'Chuva intensa',             model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
+  {code:12, title:'Falta de energia',          model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
+  {code:15, title:'Grua quebrada',             model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
+  {code:16, title:'Interdição de área',        model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
+  {code:18, title:'Acidente/ocorrência',       model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
+  {code:19, title:'Fiscalização/Paralisação',  model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
+  {code:20, title:'Dúvida técnica/Projeto',    model:'Dúvida técnica de projeto (item) — aguardando definição.'},
+  {code:22, title:'Falta de água',             model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
+  {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
+  {code:26, title:'Vistoria externa',          model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
+  {code:28, title:'Greve/Manifestação',        model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
 ];
 
 const FUNCOES = [
@@ -213,16 +213,16 @@ function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEa
 function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
 function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
 
-/* ======= AUSENTES (com autocomplete por chapa) ======= */
+/* ======= AUSENTES ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
 
-/* mapeia função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO, ...) para a primeira opção do select que começa com esse texto */
+/* usa função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO...) para escolher a variação correta no select */
 function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
   if(!funcaoRaw) return;
   const alvo = funcaoRaw.toString().trim().toUpperCase();
   if(!alvo) return;
-  const opcoes = Array.from(selectFunc.options);
-  const match = opcoes.find(o=>{
+  const options = Array.from(selectFunc.options);
+  const match = options.find(o=>{
     const txt = o.value.toUpperCase();
     return txt===alvo || txt.startsWith(alvo+" ");
   });
@@ -235,7 +235,7 @@ function wireChapaAutocomplete(tr){
   const selectFunc = tr.querySelector('[name="aus_funcao"]');
   const dl         = tr.querySelector('datalist');
 
-  // BLUR: buscar funcionário pela chapa
+  // busca dados completos pela chapa
   inputChapa.addEventListener('blur', async ()=>{
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
@@ -244,25 +244,25 @@ function wireChapaAutocomplete(tr){
       if(r.ok){
         const f = await r.json();
 
-        // Nome: usa o da API; se vier vazio, usa o label do datalist
+        // nome: do backend ou, se vier vazio, do label do datalist
         let nome = f.nome || '';
         if(!nome){
-          const optDl = Array.from(dl.options).find(o => o.value === chapa);
+          const optDl = Array.from(dl.options).find(o=>o.value===chapa);
           if(optDl && optDl.label) nome = optDl.label;
         }
         inputNome.value = nome;
 
-        // Função simplificada do CSV (CARPINTEIRO, ARMADOR, PEDREIRO...)
+        // função simplificada
         if(f.funcao){
           aplicarFuncaoSimplificada(selectFunc, f.funcao);
         }
       }
-    }catch(e){
-      console.error(e);
+    }catch(err){
+      console.error(err);
     }
   });
 
-  // AUTO-COMPLETE: popular datalist de chapas
+  // autocomplete de chapas
   let autocompTimer=null;
   inputChapa.addEventListener('input', ()=>{
     const term = inputChapa.value.trim();
@@ -275,7 +275,8 @@ function wireChapaAutocomplete(tr){
         dl.innerHTML = lista
           .map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`)
           .join('');
-      }catch{
+      }catch(err){
+        console.error(err);
         dl.innerHTML='';
       }
     },200);
@@ -284,7 +285,7 @@ function wireChapaAutocomplete(tr){
 
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8); // datalist único por linha
+  const uid = 'dl_' + Math.random().toString(36).slice(2,8);
   tr.innerHTML=`
     <td>
       <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
@@ -315,9 +316,11 @@ function atualizarBadgeAusentes(){
 }
 
 /* ======= INTERCORRÊNCIAS ======= */
-const dl=document.getElementById('listaCodigos'); const catBody=document.getElementById('catalogoBody');
+const dlCodigos=document.getElementById('listaCodigos');
+const catBody=document.getElementById('catalogoBody');
+
 function renderCatalogo(){
-  dl.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
+  dlCodigos.innerHTML = CATALOG.map(c=>`<option value="${c.code}" label="${c.title}"></option>`).join('');
   catBody.innerHTML = CATALOG.map(c=>`<tr><td>${c.code}</td><td>${c.title}</td><td>${c.model}</td></tr>`).join('');
 }
 function novaLinhaInter(cod="",desc=""){
@@ -401,7 +404,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
   renderTotalGeral(); atualizarBadgeAusentes();
   renderCatalogo(); atualizarBadgeInter();
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr => wireChapaAutocomplete(tr));
 });
 
 /* ======= INTEGRAÇÃO COM O BACKEND ======= */
@@ -440,14 +442,14 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const payload = coletarPayload();
 
-  // validação extra: identificação + pelo menos 1 intercorrência (inclusive código 0)
+  // validação: identificação e pelo menos 1 intercorrência
   const erros = [];
   if(!payload.obra)        erros.push('Informe a obra.');
   if(!payload.responsavel) erros.push('Informe o responsável.');
   if(!payload.data)        erros.push('Informe a data.');
   const interValidas = payload.intercorrencias.filter(i => i.codigo || i.descricao);
-  if(interValidas.length === 0){
-    erros.push('Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto na produção).');
+  if(interValidas.length===0){
+    erros.push('Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto).');
   }
   if(erros.length){
     alert(erros.join('\n'));
