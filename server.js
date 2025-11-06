@@ -68,7 +68,7 @@ function seedUser(email, senha, perfil) {
     ).run(email, hash, perfil);
     console.log(`Seed user criado: ${email} / ${senha} (${perfil})`);
   } else {
-    // Se já existe, apenas garante perfil correto e ativo = 1 (não mexe na senha)
+    // Garante perfil correto e ativo=1 (não mexe na senha)
     db.prepare('UPDATE usuarios SET perfil = ?, ativo = 1 WHERE id = ?')
       .run(perfil, existente.id);
     console.log(`Seed user ajustado: ${email} -> perfil=${perfil}, ativo=1`);
@@ -84,7 +84,6 @@ function requireLogin(req, res, next) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
-  // garante que o usuário ainda existe e está ativo
   try {
     const user = db
       .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
@@ -94,7 +93,6 @@ function requireLogin(req, res, next) {
       return res.status(401).json({ error: 'Sessão inválida.' });
     }
 
-    // atualiza perfil na sessão se mudou no banco
     req.session.perfil = user.perfil;
     next();
   } catch (err) {
@@ -103,12 +101,11 @@ function requireLogin(req, res, next) {
   }
 }
 
+// (Deixei aqui se um dia quiser voltar a travar pelo backend)
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
-
-  // SEMPRE consulta o banco pra garantir que é admin
   try {
     const user = db
       .prepare('SELECT id, perfil, ativo FROM usuarios WHERE id = ?')
@@ -118,7 +115,6 @@ function requireAdmin(req, res, next) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
-    // corrige/atualiza o perfil na sessão
     req.session.perfil = user.perfil;
     next();
   } catch (err) {
@@ -129,7 +125,6 @@ function requireAdmin(req, res, next) {
 
 // rota de login
 app.post('/api/login', (req, res) => {
-  // aceita tanto "email" quanto "usuario" vindo do front
   const { email, usuario, senha } = req.body || {};
 
   const loginEmail = (email || usuario || '').trim();
@@ -183,7 +178,8 @@ app.get('/api/me', (req, res) => {
 });
 
 // ---------- ADMIN: USUÁRIOS ----------
-app.get('/api/users', requireAdmin, (req, res) => {
+// ⚠️ AGORA SÓ EXIGE LOGIN (admin ou engenheiro); o admin.html decide quem vê o quê.
+app.get('/api/users', requireLogin, (req, res) => {
   try {
     const rows = db.prepare('SELECT id, email, perfil, ativo, criado_em FROM usuarios ORDER BY id').all();
     res.json({ users: rows });
@@ -193,7 +189,7 @@ app.get('/api/users', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/api/users', requireAdmin, (req, res) => {
+app.post('/api/users', requireLogin, (req, res) => {
   const { email, senha, perfil } = req.body || {};
   if (!email || !senha || !perfil) {
     return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
@@ -213,7 +209,7 @@ app.post('/api/users', requireAdmin, (req, res) => {
   }
 });
 
-app.patch('/api/users/:id', requireAdmin, (req, res) => {
+app.patch('/api/users/:id', requireLogin, (req, res) => {
   const id = Number(req.params.id);
   const { perfil, ativo } = req.body || {};
   if (!id || !perfil || typeof ativo === 'undefined') {
@@ -229,7 +225,7 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/api/users/:id/reset-password', requireAdmin, (req, res) => {
+app.post('/api/users/:id/reset-password', requireLogin, (req, res) => {
   const id = Number(req.params.id);
   const { novaSenha } = req.body || {};
   if (!id || !novaSenha) {
