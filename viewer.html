@@ -258,7 +258,7 @@
 </main>
 
 <script>
-  // --------- UTIL ---------
+  // ---------- UTIL ----------
   function formatarDataIsoParaBr(iso) {
     if (!iso) return '';
     const d = new Date(iso);
@@ -269,9 +269,8 @@
     return `${dia}/${mes}/${ano}`;
   }
 
-  // Calcula total de presentes / ausentes / férias a partir do diário
+  // Calcula totais a partir do diário
   function calcularTotais(diario) {
-    // Se o back-end já mandar agregados, usamos
     if (typeof diario.presentes === 'number' ||
         typeof diario.ausentes === 'number' ||
         typeof diario.ferias === 'number') {
@@ -287,7 +286,6 @@
       };
     }
 
-    // Caso contrário, somamos a partir do array de funções
     let presentes = 0, ausentes = 0, ferias = 0;
     if (Array.isArray(diario.funcoes)) {
       diario.funcoes.forEach(f => {
@@ -305,12 +303,11 @@
     };
   }
 
-  // --------- AUTENTICAÇÃO / HEADER ---------
+  // ---------- AUTENTICAÇÃO ----------
   async function carregarUsuario() {
     try {
       const resp = await fetch('/api/me', { credentials:'include' });
       if (!resp.ok) {
-        // não autenticado
         window.location.href = 'login.html';
         return;
       }
@@ -325,7 +322,6 @@
       document.getElementById('userGreeting').textContent = `Olá, ${nomeCurto}`;
     } catch (e) {
       console.error(e);
-      // em último caso, volta pro login
       window.location.href = 'login.html';
     }
   }
@@ -340,7 +336,7 @@
     }
   }
 
-  // --------- CARREGAR DIÁRIOS ---------
+  // ---------- CARREGAR DIÁRIOS ----------
   async function carregarDiarios() {
     const tbody = document.getElementById('tbodyDiarios');
     const empty = document.getElementById('emptyState');
@@ -362,7 +358,7 @@
     if (resp) params.set('responsavel', resp);
     if (dDe)  params.set('dataDe', dDe);
     if (dAte) params.set('dataAte', dAte);
-    if (cod)  params.set('codigoInter', cod);
+    // deixa o servidor livre pra usar esses se ele já tiver pronto:
     if (txt)  params.set('q', txt);
 
     try {
@@ -371,7 +367,6 @@
       });
 
       if (respFetch.status === 401) {
-        // sessão expirada
         window.location.href = 'login.html';
         return;
       }
@@ -381,17 +376,42 @@
         throw new Error(t || 'Erro ao buscar diários');
       }
 
-      const diarios = await respFetch.json();
-      if (!Array.isArray(diarios) || diarios.length === 0) {
+      let diarios = await respFetch.json();
+      if (!Array.isArray(diarios)) diarios = [];
+
+      // ---- FILTRO POR CÓDIGO DE INTERCORRÊNCIA (NO FRONT) ----
+      if (cod) {
+        diarios = diarios.filter(d =>
+          Array.isArray(d.intercorrencias) &&
+          d.intercorrencias.some(i => String(i.codigo || '').trim() === cod)
+        );
+      }
+
+      // ---- BUSCA LIVRE (NO FRONT, CASO BACK NÃO FAÇA) ----
+      if (txt) {
+        const termo = txt.toLowerCase();
+        diarios = diarios.filter(d => {
+          let hit = false;
+          if ((d.observacoes || '').toLowerCase().includes(termo)) hit = true;
+          if (Array.isArray(d.intercorrencias)) {
+            if (d.intercorrencias.some(i =>
+              ((i.descricao || '') + ' ' + String(i.codigo || ''))
+                .toLowerCase()
+                .includes(termo)
+            )) hit = true;
+          }
+          return hit;
+        });
+      }
+
+      if (!diarios.length) {
         empty.style.display = 'block';
         return;
       }
 
       diarios.forEach(diario => {
         const tr = document.createElement('tr');
-
         const totais = calcularTotais(diario);
-
         const dataBr = diario.dataBr || formatarDataIsoParaBr(diario.data);
 
         tr.innerHTML = `
@@ -405,11 +425,9 @@
             <button class="link" data-id="${diario.id}">Ver detalhes</button>
           </td>
         `;
-
         tbody.appendChild(tr);
       });
 
-      // click em "Ver detalhes"
       tbody.querySelectorAll('button.link').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-id');
@@ -436,7 +454,7 @@
     carregarDiarios();
   }
 
-  // --------- INIT ---------
+  // ---------- INIT ----------
   window.addEventListener('DOMContentLoaded', () => {
     carregarUsuario();
     carregarDiarios();
