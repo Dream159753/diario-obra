@@ -58,15 +58,22 @@ db.exec(`
   );
 `);
 
-// ---------- SEED DE USUÁRIOS PADRÃO ----------
+// ---------- SEED / CORREÇÃO DE USUÁRIOS PADRÃO ----------
 function seedUser(email, senha, perfil) {
-  const existe = db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email);
-  if (existe) return;
-  const hash = bcrypt.hashSync(senha, 10);
-  db.prepare(
-    'INSERT INTO usuarios (email, senha_hash, perfil, ativo) VALUES (?, ?, ?, 1)'
-  ).run(email, hash, perfil);
-  console.log(`Seed user: ${email} / ${senha}`);
+  const existente = db.prepare('SELECT id, perfil, ativo FROM usuarios WHERE email = ?').get(email);
+
+  if (!existente) {
+    const hash = bcrypt.hashSync(senha, 10);
+    db.prepare(
+      'INSERT INTO usuarios (email, senha_hash, perfil, ativo) VALUES (?, ?, ?, 1)'
+    ).run(email, hash, perfil);
+    console.log(`Seed user criado: ${email} / ${senha} (${perfil})`);
+  } else {
+    // Se já existe, apenas garante perfil correto e ativo = 1 (não mexe na senha)
+    db.prepare('UPDATE usuarios SET perfil = ?, ativo = 1 WHERE id = ?')
+      .run(perfil, existente.id);
+    console.log(`Seed user ajustado: ${email} -> perfil=${perfil}, ativo=1`);
+  }
 }
 
 seedUser('admin@obra.local',      'admin123', 'admin');
