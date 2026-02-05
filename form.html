@@ -87,7 +87,6 @@
         </tr>
       </thead>
       <tbody id="tbody">
-        <!-- TODAS AS FUNÇÕES -->
         <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
         <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
@@ -169,7 +168,6 @@
 
 <script>
 /* ====== CONFIG API ====== */
-/* caminho relativo: funciona no Render e local */
 const API = '';
 
 /* Catálogo (inclui código 0) */
@@ -228,6 +226,18 @@ function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
   if(match) selectFunc.value = match.value;
 }
 
+async function buscarFuncionarioPorChapa(chapa){
+  const term = String(chapa||'').trim();
+  if(!term) return null;
+  const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`, { credentials:'include' });
+  if(!r.ok) return null;
+  const lista = await r.json();
+  if(!Array.isArray(lista) || !lista.length) return null;
+  // tenta match exato de chapa; se não, pega o primeiro
+  const exato = lista.find(x => String(x.chapa||'').trim() === term);
+  return exato || lista[0];
+}
+
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
   const inputNome  = tr.querySelector('[name="aus_nome"]');
@@ -238,20 +248,10 @@ function wireChapaAutocomplete(tr){
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
-      const r = await fetch(`${API}/api/funcionarios/${encodeURIComponent(chapa)}`);
-      if(r.ok){
-        const f = await r.json();
-
-        let nome = f.nome || '';
-        if(!nome){
-          const optDl = Array.from(dl.options).find(o=>o.value===chapa);
-          if(optDl && optDl.label) nome = optDl.label;
-        }
-        inputNome.value = nome;
-
-        if(f.funcao){
-          aplicarFuncaoSimplificada(selectFunc, f.funcao);
-        }
+      const f = await buscarFuncionarioPorChapa(chapa);
+      if(f){
+        if(f.nome) inputNome.value = f.nome;
+        if(f.funcao) aplicarFuncaoSimplificada(selectFunc, f.funcao);
       }
     }catch(err){
       console.error(err);
@@ -265,9 +265,9 @@ function wireChapaAutocomplete(tr){
     autocompTimer = setTimeout(async ()=>{
       if(!term){ dl.innerHTML=''; return; }
       try{
-        const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`);
+        const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`, { credentials:'include' });
         const lista = r.ok ? await r.json() : [];
-        dl.innerHTML = lista
+        dl.innerHTML = (Array.isArray(lista)?lista:[])
           .map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`)
           .join('');
       }catch(err){
@@ -292,6 +292,7 @@ function novaLinhaAusente(){
   wireChapaAutocomplete(tr);
   return tr;
 }
+
 function contarAusentesListados(){
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
@@ -357,6 +358,7 @@ document.getElementById('tbody').addEventListener('input', e=>{
     atualizarLinha(e.target.closest('tr')); renderTotalGeral(); atualizarBadgeAusentes();
   }
 });
+
 document.getElementById('limpar').addEventListener('click', ()=>{
   document.querySelectorAll('#diarioForm input[type="number"]').forEach(i=>i.value=0);
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
@@ -369,6 +371,7 @@ document.getElementById('limpar').addEventListener('click', ()=>{
   document.getElementById('tbodyInter').innerHTML='';
   atualizarBadgeAusentes(); atualizarBadgeInter();
 });
+
 document.getElementById('addAusente').addEventListener('click', ()=>{
   document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente()); atualizarBadgeAusentes();
 });
@@ -405,25 +408,33 @@ window.addEventListener('DOMContentLoaded', ()=>{
 function coletarPayload(){
   const obra        = document.querySelector('[name="obra"]').value.trim();
   const responsavel = document.querySelector('[name="responsavel"]').value.trim();
-  const data        = document.querySelector('[name="data"]').value;
+  const data        = document.querySelector('[name="data"]').value; // YYYY-MM-DD
   const observacoes = document.querySelector('[name="observacoes"]').value.trim();
 
-  const funcoes=[]; document.querySelectorAll('#tbody tr').forEach(tr=>{
+  // IMPORTANTE: plural, para bater com o server.js
+  const funcoes=[]; 
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
     funcoes.push({
       funcao: tr.querySelector('.fun').textContent.trim(),
-      presente: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
-      ausente:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
-      ferias:   parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
+      presentes: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
+      ausentes:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
+      ferias:    parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
     });
   });
-  const ausentes=[]; document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+
+  // OBS: o server atual não persiste "ausentes" individualizados,
+  // mas podemos continuar enviando (o backend ignora com segurança).
+  const ausentes=[];
+  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     ausentes.push({
       chapa: tr.querySelector('[name="aus_chapa"]').value.trim(),
       nome: tr.querySelector('[name="aus_nome"]').value.trim(),
       funcao: tr.querySelector('[name="aus_funcao"]').value
     });
   });
-  const intercorrencias=[]; document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
+
+  const intercorrencias=[];
+  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
     intercorrencias.push({
       codigo: tr.querySelector('[name="inter_codigo"]').value.trim(),
       descricao: tr.querySelector('[name="inter_desc"]').value.trim()
@@ -441,6 +452,7 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   if(!payload.obra)        erros.push('Informe a obra.');
   if(!payload.responsavel) erros.push('Informe o responsável.');
   if(!payload.data)        erros.push('Informe a data.');
+
   const interValidas = payload.intercorrencias.filter(i => i.codigo || i.descricao);
   if(interValidas.length===0){
     erros.push('Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto).');
@@ -458,7 +470,8 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
       body:JSON.stringify(payload),
       credentials:'include'
     });
-    const json = await resp.json();
+
+    const json = await resp.json().catch(()=> ({}));
     if(!resp.ok){
       alert('Erro: '+(json.error||'Falha ao salvar'));
       return;
