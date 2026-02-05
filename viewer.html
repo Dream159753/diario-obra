@@ -109,39 +109,22 @@
   // --------- Utils
   function formatarDataIsoParaBr(iso){
     if(!iso) return '';
-    const d=new Date(iso); if(Number.isNaN(d.getTime())) return '';
+    // iso pode ser YYYY-MM-DD; Date() funciona, mas pode variar timezone.
+    // como seu server já manda dataBr, usamos ela quando existir.
+    const d=new Date(iso);
+    if(Number.isNaN(d.getTime())) return '';
     const dd=String(d.getDate()).padStart(2,'0');
     const mm=String(d.getMonth()+1).padStart(2,'0');
     const yy=d.getFullYear();
     return `${dd}/${mm}/${yy}`;
   }
-  function parseBrDate(str){ // dd/mm/aaaa -> Date
-    if(!str) return null;
-    const [d,m,y]=(str||'').split('/');
-    const dt=new Date(`${y}-${m}-${d}T00:00:00`);
-    return Number.isNaN(dt.getTime())?null:dt;
-  }
-  function getDateObjFromDiario(d){
-    if(d.data){ const iso=new Date(d.data); if(!Number.isNaN(iso.getTime())) return iso; }
-    if(d.dataBr){ const br=parseBrDate(d.dataBr); if(br) return br; }
-    return null;
-  }
+
   function calcularTotais(diario){
-    if(['presentes','ausentes','ferias'].some(k => typeof diario[k]==='number')){
-      const presentes=Number(diario.presentes||0);
-      const ausentes =Number(diario.ausentes ||0);
-      const ferias   =Number(diario.ferias   ||0);
-      return { presentes, ausentes, ferias, total: presentes+ausentes+ferias };
-    }
-    let p=0,a=0,f=0;
-    if(Array.isArray(diario.funcoes)){
-      diario.funcoes.forEach(fn=>{
-        p+=Number(fn.presente||0);
-        a+=Number(fn.ausente ||0);
-        f+=Number(fn.ferias  ||0);
-      });
-    }
-    return { presentes:p, ausentes:a, ferias:f, total:p+a+f };
+    // na listagem, o backend devolve presentes/ausentes/ferias agregados
+    const presentes = Number(diario.presentes || 0);
+    const ausentes  = Number(diario.ausentes  || 0);
+    const ferias    = Number(diario.ferias    || 0);
+    return { presentes, ausentes, ferias, total: presentes+ausentes+ferias };
   }
 
   // --------- Auth
@@ -153,13 +136,20 @@
       if(!user){ location.href='login.html'; return; }
       const email=user.email||'';
       document.getElementById('userGreeting').textContent=`Olá, ${(email.split('@')[0]||'usuário')}`;
-    }catch{ location.href='login.html'; }
-  }
-  async function logout(){
-    try{ await fetch('/api/logout',{method:'POST',credentials:'include'}); }finally{ location.href='login.html'; }
+    }catch{
+      location.href='login.html';
+    }
   }
 
-  // --------- Load + Filter
+  async function logout(){
+    try{
+      await fetch('/api/logout',{method:'POST',credentials:'include'});
+    } finally {
+      location.href='login.html';
+    }
+  }
+
+  // --------- Load (filtragem no BACKEND)
   async function carregarDiarios(){
     const tbody=document.getElementById('tbodyDiarios');
     const empty=document.getElementById('emptyState');
@@ -167,6 +157,7 @@
     tbody.innerHTML=''; empty.style.display='none'; error.style.display='none';
 
     const q = new URLSearchParams();
+
     const obra = document.getElementById('fObra').value.trim();
     const resp = document.getElementById('fResp').value.trim();
     const dataDe  = document.getElementById('fDataDe').value;   // yyyy-mm-dd
@@ -174,73 +165,34 @@
     const cod = document.getElementById('fCodigoInter').value.trim();
     const txt = document.getElementById('fBuscaLivre').value.trim();
 
-    // deixa para o backend filtrar o que ele já suporta
     if(obra) q.set('obra', obra);
     if(resp) q.set('responsavel', resp);
-    // NÃO envio as datas/cód/busca livre — garanto no front para evitar diferenças de formato.
+
+    // IMPORTANTE: agora enviamos pro backend (server atualizado)
+    if(dataDe)  q.set('dataDe', dataDe);
+    if(dataAte) q.set('dataAte', dataAte);
+
+    if(cod) q.set('codigo_intercorrencia', cod); // backend aceita várias chaves
+    if(txt) q.set('busca', txt);                 // backend aceita busca/q/search
 
     try{
       const r=await fetch('/api/diarios?'+q.toString(),{credentials:'include'});
       if(r.status===401){ location.href='login.html'; return; }
       if(!r.ok){ throw new Error(await r.text()||'Erro ao buscar diários'); }
+
       let diarios=await r.json();
       if(!Array.isArray(diarios)) diarios=[];
 
-      // ----- Filtros NO FRONT -----
-      // obra/responsável novamente para garantir (case-insensitive)
-      if(obra){
-        const t=obra.toLowerCase();
-        diarios=diarios.filter(d=>(d.obra||'').toLowerCase().includes(t));
+      if(!diarios.length){
+        empty.style.display='block';
+        return;
       }
-      if(resp){
-        const t=resp.toLowerCase();
-        diarios=diarios.filter(d=>(d.responsavel||'').toLowerCase().includes(t));
-      }
-
-      // datas
-      const dtDe  = dataDe  ? new Date(`${dataDe}T00:00:00`) : null;
-      const dtAte = dataAte ? new Date(`${dataAte}T23:59:59`) : null;
-      if(dtDe || dtAte){
-        diarios=diarios.filter(d=>{
-          const dd=getDateObjFromDiario(d);
-          if(!dd) return false;
-          if(dtDe  && dd<dtDe)  return false;
-          if(dtAte && dd>dtAte) return false;
-          return true;
-        });
-      }
-
-      // código de intercorrência
-      if(cod){
-        diarios=diarios.filter(d =>
-          Array.isArray(d.intercorrencias) &&
-          d.intercorrencias.some(i => String(i.codigo||'').trim()===cod)
-        );
-      }
-
-      // busca livre
-      if(txt){
-        const t=txt.toLowerCase();
-        diarios=diarios.filter(d=>{
-          if((d.obra||'').toLowerCase().includes(t)) return true;
-          if((d.responsavel||'').toLowerCase().includes(t)) return true;
-          if((d.observacoes||'').toLowerCase().includes(t)) return true;
-          if(Array.isArray(d.intercorrencias)){
-            if(d.intercorrencias.some(i =>
-              ((i.descricao||'')+' '+String(i.codigo||'')).toLowerCase().includes(t)
-            )) return true;
-          }
-          return false;
-        });
-      }
-      // ----- Fim filtros -----
-
-      if(!diarios.length){ empty.style.display='block'; return; }
 
       diarios.forEach(d=>{
         const tr=document.createElement('tr');
         const tot=calcularTotais(d);
-        const dataBr=d.dataBr || formatarDataIsoParaBr(d.data);
+        const dataBr = d.dataBr || formatarDataIsoParaBr(d.data);
+
         tr.innerHTML=`
           <td>${dataBr||''}</td>
           <td>${d.obra||''}</td>
@@ -260,7 +212,7 @@
         });
       });
 
-    }catch(e){
+    } catch(e){
       console.error(e);
       error.textContent='Erro ao carregar diários. Tente novamente.';
       error.style.display='block';
@@ -285,6 +237,13 @@
     document.getElementById('btnBuscar').addEventListener('click',carregarDiarios);
     document.getElementById('btnLimpar').addEventListener('click',limparFiltros);
     document.getElementById('btnLogout').addEventListener('click',logout);
+
+    // Enter para buscar (qualquer input)
+    document.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('keydown', (ev)=>{
+        if(ev.key === 'Enter') carregarDiarios();
+      });
+    });
   });
 </script>
 </body>
