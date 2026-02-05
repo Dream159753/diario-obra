@@ -32,7 +32,6 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      // Em produção HTTPS, pode ligar secure:
       secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 12, // 12h
     },
@@ -40,10 +39,11 @@ app.use(
 );
 
 // --------------------------------------------------
-// Gate ANTES de servir arquivos estáticos
-// (bloqueia acesso direto a páginas protegidas tipo /form.html)
+// Gate: bloquear acesso direto a páginas protegidas
+// e redirecionar para login com ?next=...
 // --------------------------------------------------
 const PROTECTED_PAGES = new Set([
+  '/index.html',
   '/form.html',
   '/viewer.html',
   '/details.html',
@@ -52,9 +52,10 @@ const PROTECTED_PAGES = new Set([
 ]);
 
 app.use((req, res, next) => {
-  // Se o usuário tentar abrir HTML protegido direto, exige sessão
   if (PROTECTED_PAGES.has(req.path)) {
-    if (!req.session.user) return res.redirect('/login.html');
+    if (!req.session.user) {
+      return res.redirect(`/login.html?next=${encodeURIComponent(req.path)}`);
+    }
   }
   next();
 });
@@ -74,7 +75,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('admin','engenheiro')),
+  role TEXT NOT NULL CHECK(role IN ('admin','engenheiro','curadoria','apontador')),
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -104,6 +105,12 @@ CREATE TABLE IF NOT EXISTS intercorrencias (
   descricao TEXT,
   FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
 );
+
+/*
+  ✅ (Ainda não implementado aqui)
+  Ausentes individualizados vai entrar depois:
+  CREATE TABLE IF NOT EXISTS ausentes (...)
+*/
 `);
 
 // (Opcional) Índices para desempenho
@@ -128,13 +135,14 @@ function ensureUser(email, pass, role) {
 ensureUser('admin@obra.local', 'admin123', 'admin');
 ensureUser('engenheiro@obra.local', '123456', 'engenheiro');
 
+// ✅ seed do APONTADOR (opcional, mas útil pra testar)
+ensureUser('apontador@obra.local', '123456', 'apontador');
+
 // --------------------------------------------------
 // Carregamento do CSV de funcionários em memória
 // --------------------------------------------------
 /**
  * Espera CSV com cabeçalho: chapa;nome;funcao (ou vírgula)
- * Exemplo:
- *   20019;JOSE HADONIAS ALVES PINHEIRO;CARPINTEIRO
  */
 const funcionarios = [];
 (function loadFuncionarios() {
@@ -151,13 +159,13 @@ const funcionarios = [];
       const line = ln.trim();
       if (!line) continue;
       l++;
-      if (l === 1 && /chapa/i.test(line) && /nome/i.test(line)) {
-        continue; // cabeçalho
-      }
+      if (l === 1 && /chapa/i.test(line) && /nome/i.test(line)) continue;
+
       const parts = line.split(/[;,]/).map(s => s.trim());
       if (parts.length < 3) continue;
       const [chapa, nome, funcao] = parts;
       if (!chapa) continue;
+
       funcionarios.push({
         chapa: String(chapa).trim(),
         nome: (nome || '').trim(),
@@ -174,9 +182,7 @@ const funcionarios = [];
 // Helpers de autenticação/autorização
 // --------------------------------------------------
 function requireLogin(req, res, next) {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'Não autenticado' });
-  }
+  if (!req.session.user) return res.status(401).json({ error: 'Não autenticado' });
   next();
 }
 function requireAdmin(req, res, next) {
@@ -185,17 +191,28 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+function requireCuradoria(req, res, next) {
+  const u = req.session.user;
+  if (!u) return res.redirect('/login.html?next=/viewer');
+  const can = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
+  if (!can) return res.status(403).send('Sem permissão para Curadoria.');
+  next();
+}
+function canLancar(req) {
+  const u = req.session.user;
+  return !!u && (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria' || u.role === 'apontador');
+}
 
 // --------------------------------------------------
 // Rotas de sessão / usuários
 // --------------------------------------------------
 app.post('/api/login', (req, res) => {
   const { email, senha } = req.body || {};
-  if (!email || !senha) {
-    return res.status(400).json({ error: 'Informe email e senha.' });
-  }
+  if (!email || !senha) return res.status(400).json({ error: 'Informe email e senha.' });
+
   const u = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
   if (!u) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+
   const ok = bcrypt.compareSync(String(senha), u.password_hash);
   if (!ok) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
 
@@ -220,9 +237,8 @@ app.get('/api/users', requireAdmin, (req, res) => {
 
 app.post('/api/users', requireAdmin, (req, res) => {
   const { email, senha, role } = req.body || {};
-  if (!email || !senha || !role) {
-    return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
-  }
+  if (!email || !senha || !role) return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
+
   try {
     const hash = bcrypt.hashSync(senha, 10);
     db.prepare('INSERT INTO users(email,password_hash,role,active) VALUES(?,?,?,1)')
@@ -241,12 +257,8 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
       const hash = bcrypt.hashSync(senha, 10);
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
     }
-    if (role) {
-      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
-    }
-    if (typeof active !== 'undefined') {
-      db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
-    }
+    if (role) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+    if (typeof active !== 'undefined') db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: 'Falha ao atualizar usuário.' });
@@ -276,13 +288,17 @@ app.get('/api/funcionarios', requireLogin, (req, res) => {
 // --------------------------------------------------
 app.post('/api/diarios', requireLogin, (req, res) => {
   try {
+    if (!canLancar(req)) {
+      return res.status(403).json({ error: 'Seu perfil não tem permissão para lançar diário.' });
+    }
+
     const {
-      data,
+      data,          // 'YYYY-MM-DD'
       obra,
       responsavel,
       observacoes,
-      funcoes = [],
-      intercorrencias = [],
+      funcoes = [],          // [{funcao, presentes, ausentes, ferias}]
+      intercorrencias = [],  // [{codigo, descricao}]
     } = req.body || {};
 
     if (!data || !obra || !responsavel) {
@@ -302,9 +318,9 @@ app.post('/api/diarios', requireLogin, (req, res) => {
       insF.run(
         diarioId,
         (f.funcao || '').trim(),
-        Number(f.presentes || f.presentes === 0 ? f.presentes : f.presentes), // (mantém compat)
-        Number(f.ausentes  || 0),
-        Number(f.ferias    || 0)
+        Number(f.presentes || 0),
+        Number(f.ausentes || 0),
+        Number(f.ferias || 0)
       );
     }
 
@@ -323,8 +339,14 @@ app.post('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
+// LISTA DIÁRIOS (Curadoria)
 app.get('/api/diarios', requireLogin, (req, res) => {
   try {
+    // ✅ Apontador NÃO lista diários (curadoria)
+    const u = req.session.user;
+    const canList = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
+    if (!canList) return res.status(403).json({ error: 'Sem permissão para Curadoria.' });
+
     const obra = (req.query.obra || '').trim();
     const responsavel = (req.query.responsavel || '').trim();
 
@@ -410,8 +432,13 @@ app.get('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
+// Detalhe de um diário (Curadoria)
 app.get('/api/diarios/:id', requireLogin, (req, res) => {
   try {
+    const u = req.session.user;
+    const canView = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
+    if (!canView) return res.status(403).json({ error: 'Sem permissão para Curadoria.' });
+
     const id = Number(req.params.id);
     const d = db.prepare('SELECT * FROM diarios WHERE id = ?').get(id);
     if (!d) return res.status(404).json({ error: 'Diário não encontrado.' });
@@ -424,7 +451,8 @@ app.get('/api/diarios/:id', requireLogin, (req, res) => {
       'SELECT codigo,descricao FROM intercorrencias WHERE diario_id = ? ORDER BY id'
     ).all(id);
 
-    res.json({ ...d, funcoes: fun, intercorrencias: inc });
+    // ⚠️ ausentes individualizados ainda não existe aqui — entra na próxima etapa
+    res.json({ ...d, funcoes: fun, intercorrencias: inc, ausentes: [] });
   } catch (e) {
     console.error('GET /api/diarios/:id erro:', e);
     res.status(500).json({ error: 'Falha ao buscar diário.' });
@@ -432,19 +460,26 @@ app.get('/api/diarios/:id', requireLogin, (req, res) => {
 });
 
 // -----------------------------------------------
-// Fallback para arquivos HTML (roteamento simples)
+// Rotas HTML amigáveis (não usar /form.html direto)
 // -----------------------------------------------
-app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get('/', (req, res) => {
+  if (!req.session.user) return res.redirect('/login.html?next=/');
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/login', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
 
 app.get('/form', (req, res) => {
-  if (!req.session.user) return res.redirect('/login.html');
+  if (!req.session.user) return res.redirect('/login.html?next=/form');
   res.sendFile(path.join(__dirname, 'form.html'));
 });
-app.get('/viewer', (req, res) => {
-  if (!req.session.user) return res.redirect('/login.html');
+
+app.get('/viewer', requireCuradoria, (_req, res) => {
   res.sendFile(path.join(__dirname, 'viewer.html'));
 });
+
 app.get('/admin.html', requireLogin, requireAdmin, (_req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
