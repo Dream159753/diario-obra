@@ -1,62 +1,133 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Diário de Obra — Início</title>
-<style>
-  :root { --prim:#3A6385; --muted:#66758a; }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0; min-height:100dvh; display:grid; place-items:center;
-    font-family: Arial, sans-serif; background:#f4f6f9; color:#233;
-    padding:24px;
-  }
-  .card{
-    width:100%; max-width:720px; background:#fff; border-radius:12px;
-    box-shadow:0 8px 24px rgba(0,0,0,.08); overflow:hidden;
-  }
-  header{
-    padding:20px 24px; background:#f9fbfd; border-bottom:1px solid #eef2f6;
-  }
-  header h1{ margin:0; font-size:20px; color:#333; }
-  header p{ margin:6px 0 0; font-size:13px; color:var(--muted); }
-  main{ padding:20px 24px; }
-  .actions{ display:flex; gap:12px; flex-wrap:wrap; }
-  .btn{
-    display:inline-block; padding:12px 18px; border-radius:8px; border:0;
-    background:var(--prim); color:#fff; font-size:15px; text-decoration:none;
-    cursor:pointer; transition:.15s ease; text-align:center;
-  }
-  .btn:hover{ filter:brightness(.96); transform:translateY(-1px); }
-  .muted{ font-size:12px; color:var(--muted); margin-top:14px; }
-  footer{ padding:14px 24px; background:#f9fbfd; border-top:1px solid #eef2f6; font-size:12px; color:var(--muted); }
-  code{ background:#eef2f6; padding:2px 6px; border-radius:6px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diário de Obra</title>
+  <style>
+    :root{
+      --bg:#f4f6fb; --card:#ffffff; --prim:#3A6385; --prim-dark:#284666;
+      --muted:#7b8794; --border:#e2e8f0;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#102a43}
+    header{
+      background:#fff;border-bottom:1px solid var(--border);
+      padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;z-index:10
+    }
+    header h1{margin:0;font-size:18px;font-weight:700;color:#102a43}
+    header small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+    .user-area{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+    .btn{padding:8px 14px;border-radius:8px;border:1px solid var(--prim);cursor:pointer;font-size:14px;background:#fff;color:var(--prim)}
+    .btn:hover{background:var(--prim);color:#fff}
+
+    main{max-width:1100px;margin:32px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+    @media(max-width:820px){.grid{grid-template-columns:1fr}}
+
+    .card{
+      background:var(--card);border-radius:16px;border:1px solid var(--border);
+      box-shadow:0 10px 26px rgba(15,23,42,.08);
+      overflow:hidden;cursor:pointer;transition:.15s transform,.15s box-shadow;
+      min-height:240px;display:flex;flex-direction:column
+    }
+    .card:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(15,23,42,.12)}
+    .hero{
+      height:140px;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg, rgba(58,99,133,.12), rgba(58,99,133,.04));
+    }
+    .hero span{
+      width:76px;height:76px;border-radius:18px;background:#fff;border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;font-size:34px;
+      box-shadow:0 8px 20px rgba(15,23,42,.10)
+    }
+    .content{padding:16px 18px 18px}
+    .title{font-size:18px;font-weight:800;color:#102a43;margin:0 0 6px}
+    .desc{margin:0;color:var(--muted);line-height:1.35}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;margin-top:12px;
+      font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+      color:#233;background:#f8fafc
+    }
+    .disabled{opacity:.55;cursor:not-allowed}
+    .disabled:hover{transform:none;box-shadow:0 10px 26px rgba(15,23,42,.08)}
+  </style>
 </head>
 <body>
-  <div class="card">
-    <header>
-      <h1>📒 Diário de Obra</h1>
-      <p>Início</p>
-    </header>
-    <main>
-      <div class="actions">
-        <a class="btn" href="form.html">Abrir Diário (form.html)</a>
-      </div>
-      <p class="muted">Ao publicar online, o formulário usará a mesma URL deste site para acessar <code>/api/.../</code>.</p>
-    </main>
-    <footer>
-      <span id="apiInfo">API preparada.</span>
-    </footer>
+<header>
+  <div>
+    <h1>Diário de Obra</h1>
+    <small>Escolha uma opção para continuar</small>
   </div>
+  <div class="user-area">
+    <span id="userGreeting">Olá, …</span>
+    <button id="btnLogout" class="btn">Sair</button>
+  </div>
+</header>
 
-  <script>
-    // Disponibiliza a base da API: local usa localhost, online usa o mesmo domínio (sem CORS).
-    const API = (location.hostname === 'localhost') ? 'http://localhost:3000' : '';
-    window.API = API;
-    // Informação simples no rodapé (opcional)
-    document.getElementById('apiInfo').textContent = 'API: ' + (API || '(mesmo domínio) /api');
-  </script>
+<main>
+  <div class="grid">
+    <div id="btnForm" class="card" role="button" tabindex="0">
+      <div class="hero"><span>📝</span></div>
+      <div class="content">
+        <p class="title">Lançar Diário</p>
+        <p class="desc">Preencha equipe, ausentes, intercorrências e observações do dia.</p>
+        <span class="pill">Acesso: Lançador / Curadoria</span>
+      </div>
+    </div>
+
+    <div id="btnCuradoria" class="card" role="button" tabindex="0">
+      <div class="hero"><span>📊</span></div>
+      <div class="content">
+        <p class="title">Curadoria</p>
+        <p class="desc">Filtre, revise e consulte os diários já lançados.</p>
+        <span id="pillCuradoria" class="pill">Acesso: Curadoria</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  async function me(){
+    const r = await fetch('/api/me', { credentials:'include' });
+    const j = await r.json();
+    return j.user || null;
+  }
+
+  function clickCard(el, fn){
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fn(); } });
+  }
+
+  async function init(){
+    const user = await me();
+    if(!user){ location.href = '/login.html?next=/'; return; }
+
+    const email = user.email || '';
+    document.getElementById('userGreeting').textContent = `Olá, ${(email.split('@')[0]||'usuário')}`;
+
+    // Sempre pode lançar
+    clickCard(document.getElementById('btnForm'), ()=> location.href = '/form');
+
+    // Curadoria só para quem tem permissão
+    const canCuradoria = (user.role === 'admin' || user.role === 'engenheiro' || user.role === 'curadoria');
+    const cur = document.getElementById('btnCuradoria');
+
+    if(canCuradoria){
+      clickCard(cur, ()=> location.href = '/viewer');
+    } else {
+      cur.classList.add('disabled');
+      document.getElementById('pillCuradoria').textContent = 'Sem acesso';
+      clickCard(cur, ()=> alert('Seu usuário não tem permissão para acessar a Curadoria.'));
+    }
+
+    document.getElementById('btnLogout').addEventListener('click', async ()=>{
+      try{ await fetch('/api/logout', { method:'POST', credentials:'include' }); } finally { location.href='/login.html'; }
+    });
+  }
+
+  window.addEventListener('DOMContentLoaded', init);
+</script>
 </body>
 </html>
