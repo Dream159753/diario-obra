@@ -164,6 +164,38 @@ function requireAdmin(req, res, next) {
 }
 
 // --------------------------------------------------
+// Helpers de normalização (NOVO)
+// --------------------------------------------------
+function parseDateParam(value) {
+  if (!value) return null;
+  const v = String(value).trim();
+
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+
+  // DD/MM/YYYY  -> YYYY-MM-DD
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+    const [dd, mm, yyyy] = v.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // tenta Date()
+  const dt = new Date(v);
+  if (!Number.isNaN(dt.getTime())) {
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
+function normStr(s) {
+  return String(s ?? '').trim();
+}
+
+// --------------------------------------------------
 // Rotas de sessão / usuários
 // --------------------------------------------------
 app.post('/api/login', (req, res) => {
@@ -305,23 +337,52 @@ app.post('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
-// LISTA DIÁRIOS (com filtro por intercorrência, obra, responsável e datas)
+// LISTA DIÁRIOS (com filtro por intercorrência, obra, responsável e datas) — ATUALIZADO
 app.get('/api/diarios', requireLogin, (req, res) => {
   try {
-    const obra = (req.query.obra || '').trim();
-    const responsavel = (req.query.responsavel || '').trim();
+    const obra = normStr(req.query.obra || req.query.OBRA || '');
+    const responsavel = normStr(
+      req.query.responsavel || req.query.responsável || req.query.resp || ''
+    );
+
+    // busca livre (se existir no front)
+    const busca = normStr(req.query.busca || req.query.q || req.query.search || '');
 
     // Aceita vários nomes para compatibilidade
-    const codigoParam =
-      (req.query.codigo_intercorrencia ||
-        req.query.codigo ||
-        req.query.cod ||
-        req.query.intercorrencia ||
-        '').trim();
-    const codigo = codigoParam || null;
+    const codigoParam = normStr(
+      req.query.codigo_intercorrencia ||
+      req.query.codigoIntercorrencia ||
+      req.query.codigo ||
+      req.query.cod ||
+      req.query.intercorrencia ||
+      req.query.intercorrenciaCodigo ||
+      ''
+    );
 
-    const dataDe = (req.query.dataDe || req.query.data_de || '').trim();
-    const dataAte = (req.query.dataAte || req.query.data_ate || '').trim();
+    // Permite múltiplos códigos separados por vírgula: "15, 18"
+    const codigos = codigoParam
+      ? codigoParam.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+    // Datas (aceita vários nomes)
+    const dataDeRaw = normStr(
+      req.query.dataDe ||
+      req.query.data_de ||
+      req.query.dataIni ||
+      req.query.dataInicio ||
+      ''
+    );
+
+    const dataAteRaw = normStr(
+      req.query.dataAte ||
+      req.query.data_ate ||
+      req.query.dataFim ||
+      req.query.dataFinal ||
+      ''
+    );
+
+    const dataDe = parseDateParam(dataDeRaw);
+    const dataAte = parseDateParam(dataAteRaw);
 
     let sql = `
       SELECT
@@ -329,6 +390,7 @@ app.get('/api/diarios', requireLogin, (req, res) => {
         d.data,
         d.obra,
         d.responsavel,
+        d.observacoes,
         COALESCE(SUM(f.presentes), 0) AS presentes,
         COALESCE(SUM(f.ausentes),  0) AS ausentes,
         COALESCE(SUM(f.ferias),    0) AS ferias
@@ -354,7 +416,9 @@ app.get('/api/diarios', requireLogin, (req, res) => {
       sql += ` AND DATE(d.data) <= DATE(@dataAte) `;
       params.dataAte = dataAte;
     }
-    if (codigo) {
+
+    // Intercorrência: aceita 1 ou vários códigos
+    if (codigos.length === 1) {
       sql += `
         AND EXISTS (
           SELECT 1
@@ -363,7 +427,40 @@ app.get('/api/diarios', requireLogin, (req, res) => {
             AND TRIM(ic.codigo) = TRIM(@codigo)
         )
       `;
-      params.codigo = codigo;
+      params.codigo = codigos[0];
+    } else if (codigos.length > 1) {
+      // IN dinâmico com placeholders nomeados
+      const ph = codigos.map((_, i) => `@c${i}`).join(', ');
+      codigos.forEach((c, i) => (params[`c${i}`] = c));
+
+      sql += `
+        AND EXISTS (
+          SELECT 1
+          FROM intercorrencias ic
+          WHERE ic.diario_id = d.id
+            AND TRIM(ic.codigo) IN (${ph})
+        )
+      `;
+    }
+
+    // Busca livre (obra, responsavel, observacoes, e códigos/descrições de intercorrência)
+    if (busca) {
+      sql += `
+        AND (
+          LOWER(d.obra) LIKE LOWER(@busca) OR
+          LOWER(d.responsavel) LIKE LOWER(@busca) OR
+          LOWER(COALESCE(d.observacoes,'')) LIKE LOWER(@busca) OR
+          EXISTS (
+            SELECT 1 FROM intercorrencias ic2
+            WHERE ic2.diario_id = d.id
+              AND (
+                LOWER(COALESCE(ic2.codigo,'')) LIKE LOWER(@busca) OR
+                LOWER(COALESCE(ic2.descricao,'')) LIKE LOWER(@busca)
+              )
+          )
+        )
+      `;
+      params.busca = `%${busca}%`;
     }
 
     sql += `
@@ -376,12 +473,18 @@ app.get('/api/diarios', requireLogin, (req, res) => {
     const out = rows.map(r => {
       let dataBr = '';
       try {
-        const dt = new Date(r.data);
-        if (!isNaN(dt.getTime())) {
-          const dd = String(dt.getDate()).padStart(2, '0');
-          const mm = String(dt.getMonth() + 1).padStart(2, '0');
-          const yy = dt.getFullYear();
+        // r.data é idealmente YYYY-MM-DD
+        if (r.data && /^\d{4}-\d{2}-\d{2}$/.test(r.data)) {
+          const [yy, mm, dd] = r.data.split('-');
           dataBr = `${dd}/${mm}/${yy}`;
+        } else {
+          const dt = new Date(r.data);
+          if (!isNaN(dt.getTime())) {
+            const dd = String(dt.getDate()).padStart(2, '0');
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const yy = dt.getFullYear();
+            dataBr = `${dd}/${mm}/${yy}`;
+          }
         }
       } catch {}
       return { ...r, dataBr };
