@@ -17,6 +17,9 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-diario-obra';
 
+// Render/Proxy (importante para cookies em produção)
+app.set('trust proxy', 1);
+
 // Middlewares
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -29,10 +32,32 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
+      // Em produção HTTPS, pode ligar secure:
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 12, // 12h
     },
   })
 );
+
+// --------------------------------------------------
+// Gate ANTES de servir arquivos estáticos
+// (bloqueia acesso direto a páginas protegidas tipo /form.html)
+// --------------------------------------------------
+const PROTECTED_PAGES = new Set([
+  '/form.html',
+  '/viewer.html',
+  '/details.html',
+  '/edit.html',
+  '/admin.html',
+]);
+
+app.use((req, res, next) => {
+  // Se o usuário tentar abrir HTML protegido direto, exige sessão
+  if (PROTECTED_PAGES.has(req.path)) {
+    if (!req.session.user) return res.redirect('/login.html');
+  }
+  next();
+});
 
 // Conteúdo estático (HTML/JS/CSS)
 app.use(express.static(path.join(__dirname)));
@@ -127,10 +152,8 @@ const funcionarios = [];
       if (!line) continue;
       l++;
       if (l === 1 && /chapa/i.test(line) && /nome/i.test(line)) {
-        // Cabeçalho – ignora
-        continue;
+        continue; // cabeçalho
       }
-      // divide por ; ou ,
       const parts = line.split(/[;,]/).map(s => s.trim());
       if (parts.length < 3) continue;
       const [chapa, nome, funcao] = parts;
@@ -161,38 +184,6 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Acesso restrito a administradores.' });
   }
   next();
-}
-
-// --------------------------------------------------
-// Helpers de normalização (NOVO)
-// --------------------------------------------------
-function parseDateParam(value) {
-  if (!value) return null;
-  const v = String(value).trim();
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-
-  // DD/MM/YYYY  -> YYYY-MM-DD
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
-    const [dd, mm, yyyy] = v.split('/');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  // tenta Date()
-  const dt = new Date(v);
-  if (!Number.isNaN(dt.getTime())) {
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  return null;
-}
-
-function normStr(s) {
-  return String(s ?? '').trim();
 }
 
 // --------------------------------------------------
@@ -270,33 +261,28 @@ app.get('/api/funcionarios', requireLogin, (req, res) => {
   if (!q) return res.json([]);
   const isDigits = /^\d+$/.test(q);
 
-  // Busca por chapa (prefixo) primeiro
   let matches = funcionarios.filter(f => f.chapa.startsWith(q));
 
-  // Se nada, tenta por nome (contém)
   if (matches.length === 0 && !isDigits) {
     const qLower = q.toLowerCase();
     matches = funcionarios.filter(f => f.nome.toLowerCase().includes(qLower));
   }
 
-  // Limita a 30 resultados
   res.json(matches.slice(0, 30));
 });
 
 // --------------------------------------------------
 // Diários – criação e leitura
 // --------------------------------------------------
-
-// Cria/salva um diário
 app.post('/api/diarios', requireLogin, (req, res) => {
   try {
     const {
-      data,          // 'YYYY-MM-DD'
+      data,
       obra,
       responsavel,
       observacoes,
-      funcoes = [],          // [{funcao, presentes, ausentes, ferias}]
-      intercorrencias = [],  // [{codigo, descricao}]
+      funcoes = [],
+      intercorrencias = [],
     } = req.body || {};
 
     if (!data || !obra || !responsavel) {
@@ -316,9 +302,9 @@ app.post('/api/diarios', requireLogin, (req, res) => {
       insF.run(
         diarioId,
         (f.funcao || '').trim(),
-        Number(f.presentes || 0),
-        Number(f.ausentes || 0),
-        Number(f.ferias || 0)
+        Number(f.presentes || f.presentes === 0 ? f.presentes : f.presentes), // (mantém compat)
+        Number(f.ausentes  || 0),
+        Number(f.ferias    || 0)
       );
     }
 
@@ -337,52 +323,21 @@ app.post('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
-// LISTA DIÁRIOS (com filtro por intercorrência, obra, responsável e datas) — ATUALIZADO
 app.get('/api/diarios', requireLogin, (req, res) => {
   try {
-    const obra = normStr(req.query.obra || req.query.OBRA || '');
-    const responsavel = normStr(
-      req.query.responsavel || req.query.responsável || req.query.resp || ''
-    );
+    const obra = (req.query.obra || '').trim();
+    const responsavel = (req.query.responsavel || '').trim();
 
-    // busca livre (se existir no front)
-    const busca = normStr(req.query.busca || req.query.q || req.query.search || '');
+    const codigoParam =
+      (req.query.codigo_intercorrencia ||
+        req.query.codigo ||
+        req.query.cod ||
+        req.query.intercorrencia ||
+        '').trim();
+    const codigo = codigoParam || null;
 
-    // Aceita vários nomes para compatibilidade
-    const codigoParam = normStr(
-      req.query.codigo_intercorrencia ||
-      req.query.codigoIntercorrencia ||
-      req.query.codigo ||
-      req.query.cod ||
-      req.query.intercorrencia ||
-      req.query.intercorrenciaCodigo ||
-      ''
-    );
-
-    // Permite múltiplos códigos separados por vírgula: "15, 18"
-    const codigos = codigoParam
-      ? codigoParam.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
-
-    // Datas (aceita vários nomes)
-    const dataDeRaw = normStr(
-      req.query.dataDe ||
-      req.query.data_de ||
-      req.query.dataIni ||
-      req.query.dataInicio ||
-      ''
-    );
-
-    const dataAteRaw = normStr(
-      req.query.dataAte ||
-      req.query.data_ate ||
-      req.query.dataFim ||
-      req.query.dataFinal ||
-      ''
-    );
-
-    const dataDe = parseDateParam(dataDeRaw);
-    const dataAte = parseDateParam(dataAteRaw);
+    const dataDe = (req.query.dataDe || req.query.data_de || '').trim();
+    const dataAte = (req.query.dataAte || req.query.data_ate || '').trim();
 
     let sql = `
       SELECT
@@ -390,7 +345,6 @@ app.get('/api/diarios', requireLogin, (req, res) => {
         d.data,
         d.obra,
         d.responsavel,
-        d.observacoes,
         COALESCE(SUM(f.presentes), 0) AS presentes,
         COALESCE(SUM(f.ausentes),  0) AS ausentes,
         COALESCE(SUM(f.ferias),    0) AS ferias
@@ -416,9 +370,7 @@ app.get('/api/diarios', requireLogin, (req, res) => {
       sql += ` AND DATE(d.data) <= DATE(@dataAte) `;
       params.dataAte = dataAte;
     }
-
-    // Intercorrência: aceita 1 ou vários códigos
-    if (codigos.length === 1) {
+    if (codigo) {
       sql += `
         AND EXISTS (
           SELECT 1
@@ -427,40 +379,7 @@ app.get('/api/diarios', requireLogin, (req, res) => {
             AND TRIM(ic.codigo) = TRIM(@codigo)
         )
       `;
-      params.codigo = codigos[0];
-    } else if (codigos.length > 1) {
-      // IN dinâmico com placeholders nomeados
-      const ph = codigos.map((_, i) => `@c${i}`).join(', ');
-      codigos.forEach((c, i) => (params[`c${i}`] = c));
-
-      sql += `
-        AND EXISTS (
-          SELECT 1
-          FROM intercorrencias ic
-          WHERE ic.diario_id = d.id
-            AND TRIM(ic.codigo) IN (${ph})
-        )
-      `;
-    }
-
-    // Busca livre (obra, responsavel, observacoes, e códigos/descrições de intercorrência)
-    if (busca) {
-      sql += `
-        AND (
-          LOWER(d.obra) LIKE LOWER(@busca) OR
-          LOWER(d.responsavel) LIKE LOWER(@busca) OR
-          LOWER(COALESCE(d.observacoes,'')) LIKE LOWER(@busca) OR
-          EXISTS (
-            SELECT 1 FROM intercorrencias ic2
-            WHERE ic2.diario_id = d.id
-              AND (
-                LOWER(COALESCE(ic2.codigo,'')) LIKE LOWER(@busca) OR
-                LOWER(COALESCE(ic2.descricao,'')) LIKE LOWER(@busca)
-              )
-          )
-        )
-      `;
-      params.busca = `%${busca}%`;
+      params.codigo = codigo;
     }
 
     sql += `
@@ -473,18 +392,12 @@ app.get('/api/diarios', requireLogin, (req, res) => {
     const out = rows.map(r => {
       let dataBr = '';
       try {
-        // r.data é idealmente YYYY-MM-DD
-        if (r.data && /^\d{4}-\d{2}-\d{2}$/.test(r.data)) {
-          const [yy, mm, dd] = r.data.split('-');
+        const dt = new Date(r.data);
+        if (!isNaN(dt.getTime())) {
+          const dd = String(dt.getDate()).padStart(2, '0');
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const yy = dt.getFullYear();
           dataBr = `${dd}/${mm}/${yy}`;
-        } else {
-          const dt = new Date(r.data);
-          if (!isNaN(dt.getTime())) {
-            const dd = String(dt.getDate()).padStart(2, '0');
-            const mm = String(dt.getMonth() + 1).padStart(2, '0');
-            const yy = dt.getFullYear();
-            dataBr = `${dd}/${mm}/${yy}`;
-          }
         }
       } catch {}
       return { ...r, dataBr };
@@ -497,7 +410,6 @@ app.get('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
-// Detalhe de um diário
 app.get('/api/diarios/:id', requireLogin, (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -522,16 +434,15 @@ app.get('/api/diarios/:id', requireLogin, (req, res) => {
 // -----------------------------------------------
 // Fallback para arquivos HTML (roteamento simples)
 // -----------------------------------------------
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-app.get('/login', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'login.html'));
-});
-app.get('/form', requireLogin, (_req, res) => {
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+
+app.get('/form', (req, res) => {
+  if (!req.session.user) return res.redirect('/login.html');
   res.sendFile(path.join(__dirname, 'form.html'));
 });
-app.get('/viewer', requireLogin, (_req, res) => {
+app.get('/viewer', (req, res) => {
+  if (!req.session.user) return res.redirect('/login.html');
   res.sendFile(path.join(__dirname, 'viewer.html'));
 });
 app.get('/admin.html', requireLogin, requireAdmin, (_req, res) => {
