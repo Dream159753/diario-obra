@@ -11,8 +11,6 @@
   }
   *{ box-sizing:border-box; }
   body{ font-family: Arial, sans-serif; background:var(--bg); margin:0; color:#233; }
-
-  /* ✅ Cabeçalho padrão */
   header{
     background:#fff;border-bottom:1px solid var(--border);
     padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
@@ -33,8 +31,6 @@
   .del:hover{ filter:brightness(.95); }
 
   main{ max-width:1100px; margin:18px auto 40px; padding:0 16px; }
-
-  h2{ text-align:center; color:#333; margin:0 0 16px; }
 
   .section{
     background:var(--card); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08);
@@ -113,7 +109,15 @@
     <div class="section" id="sec-identificacao">
       <h3>Identificação do Diário</h3>
       <table>
-        <tr><th style="width:30%">Obra</th><td><input type="text" name="obra" placeholder="Nome da obra" required></td></tr>
+        <tr>
+          <th style="width:30%">Obra</th>
+          <td>
+            <!-- ✅ agora é select -->
+            <select name="obra" id="obraSelect" required>
+              <option value="" selected disabled>Carregando obras…</option>
+            </select>
+          </td>
+        </tr>
         <tr><th>Responsável pelo preenchimento</th><td><input type="text" name="responsavel" placeholder="Seu nome" required></td></tr>
         <tr><th>Data</th><td><input type="date" name="data" required></td></tr>
       </table>
@@ -138,7 +142,6 @@
           </tr>
         </thead>
         <tbody id="tbody">
-          <!-- TODAS AS FUNÇÕES -->
           <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
           <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
           <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
@@ -184,97 +187,108 @@
 
     <!-- INTERCORRÊNCIAS -->
     <div class="section" id="sec-inter">
-      <h3>Intercorrências (fatores que atrapalharam a produção) <span id="badgeInter" class="pill">Itens: 0 • Duplicados: 0</span></h3>
+      <h3>Intercorrências <span id="badgeInter" class="pill">Itens: 0 • Duplicados: 0</span></h3>
       <div class="bar" style="border-top:1px solid #eef2f6;">
         <div class="meta">Use um <strong>código numérico</strong> e descreva o ocorrido. Ex.: <em>15 — grua quebrada das 07:00 às 16:00</em></div>
         <div>
-          <button type="button" class="btn btn-sm btn-ghost" id="toggleCatalogo">📖 Ver catálogo de códigos</button>
-          <button type="button" class="btn btn-sm" id="addInter">+ Adicionar intercorrência</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="toggleCatalogo">📖 Ver catálogo</button>
+          <button type="button" class="btn btn-sm" id="addInter">+ Adicionar</button>
         </div>
       </div>
       <div class="catalog" id="catalogo">
         <table>
-          <thead><tr><th style="width:12%">Código</th><th>Título</th><th>Modelo de descrição</th></tr></thead>
+          <thead><tr><th style="width:12%">Código</th><th>Título</th><th>Modelo</th></tr></thead>
           <tbody id="catalogoBody"></tbody>
         </table>
       </div>
       <table id="tblInter">
         <thead><tr><th style="width:18%">Código</th><th>Descrição</th><th style="width:12%"></th></tr></thead>
         <tbody id="tbodyInter"></tbody>
-        <tfoot><tr><td colspan="3" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addInter2">+ Adicionar intercorrência</button></td></tr></tfoot>
+        <tfoot><tr><td colspan="3" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addInter2">+ Adicionar</button></td></tr></tfoot>
       </table>
       <datalist id="listaCodigos"></datalist>
     </div>
 
     <!-- OBSERVAÇÕES -->
     <div class="section" id="sec-observacoes">
-      <h3>Observações / Serviços em Execução</h3>
+      <h3>Observações / Serviços</h3>
       <div style="padding:16px;">
         <textarea name="observacoes" placeholder="Descreva aqui os serviços executados hoje..." rows="5" style="width:100%;"></textarea>
       </div>
     </div>
 
-    <!-- BOTÃO FINAL -->
     <div class="foot-actions"><button type="submit" class="btn">Salvar Diário</button></div>
   </form>
 </main>
 
 <script>
-/* ====== CONFIG API ====== */
 const API = '';
 
-/* ✅ Header: auth + preencher responsável + logout */
-async function carregarUsuarioEPreencherResponsavel(){
-  try{
-    const r = await fetch(`${API}/api/me`, { credentials:'include' });
-    if(!r.ok){
-      location.href='login.html';
-      return;
-    }
-    const { user } = await r.json();
-    if(!user){
-      location.href='login.html';
-      return;
-    }
-
-    const email = user.email || '';
-    const nomeCurto = (email.split('@')[0] || 'usuário');
-    document.getElementById('userGreeting').textContent = `Olá, ${nomeCurto}`;
-
-    // ✅ preenche o responsável automaticamente (editável)
-    const inpResp = document.querySelector('[name="responsavel"]');
-    if(inpResp && (!inpResp.value || inpResp.value.trim()==='')){
-      inpResp.value = nomeCurto;
-    }
-  } catch(e){
-    location.href='login.html';
-  }
-}
-
 async function logout(){
-  try{
-    await fetch(`${API}/api/logout`, { method:'POST', credentials:'include' });
-  } finally {
-    location.href='login.html';
-  }
+  try{ await fetch(`${API}/api/logout`, { method:'POST', credentials:'include' }); }
+  finally{ location.href='login.html'; }
 }
 document.getElementById('btnLogout').addEventListener('click', logout);
 
-/* Catálogo (inclui código 0) */
+function mostrarErro(msg){
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function esconderErro(){
+  const box = document.getElementById('errorBox');
+  box.textContent = '';
+  box.style.display = 'none';
+}
+
+async function carregarUsuario(){
+  const r = await fetch(`${API}/api/me`, { credentials:'include' });
+  const { user } = await r.json();
+  if(!user){ location.href='login.html'; return null; }
+  document.getElementById('userGreeting').textContent = `Olá, ${(user.email||'').split('@')[0] || 'usuário'}`;
+  const inpResp = document.querySelector('[name="responsavel"]');
+  if(inpResp && (!inpResp.value || inpResp.value.trim()==='')) inpResp.value = (user.email||'').split('@')[0] || '';
+  return user;
+}
+
+// ✅ Carregar obras para o select
+async function carregarObras(){
+  const sel = document.getElementById('obraSelect');
+  sel.innerHTML = `<option value="" selected disabled>Selecione a obra…</option>`;
+
+  const r = await fetch(`${API}/api/obras`, { credentials:'include' });
+  if(r.status===401){ location.href='login.html'; return; }
+  const obras = await r.json();
+  if(!Array.isArray(obras) || obras.length === 0){
+    sel.innerHTML = `<option value="" selected disabled>Nenhuma obra cadastrada (fale com o admin)</option>`;
+    sel.disabled = true;
+    return;
+  }
+  obras.forEach(o=>{
+    const opt = document.createElement('option');
+    opt.value = o.nome;
+    opt.textContent = o.nome;
+    sel.appendChild(opt);
+  });
+  sel.disabled = false;
+}
+
+/* Catálogo */
 const CATALOG = [
-  {code:0,  title:'Sem intercorrências',       model:'Não houve intercorrencias que afetam a produção.'},
-  {code:10, title:'Falta de material',         model:'Falta de material (especificar) das HH:MM às HH:MM.'},
-  {code:11, title:'Chuva intensa',             model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
-  {code:12, title:'Falta de energia',          model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
-  {code:15, title:'Grua quebrada',             model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
-  {code:16, title:'Interdição de área',        model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
-  {code:18, title:'Acidente/ocorrência',       model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
-  {code:19, title:'Fiscalização/Paralisação',  model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
-  {code:20, title:'Dúvida técnica/Projeto',    model:'Dúvida técnica de projeto (item) — aguardando definição.'},
-  {code:22, title:'Falta de água',             model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
+  {code:0,  title:'Sem intercorrências', model:'Não houve intercorrencias que afetam a produção.'},
+  {code:10, title:'Falta de material', model:'Falta de material (especificar) das HH:MM às HH:MM.'},
+  {code:11, title:'Chuva intensa', model:'Chuva intensa das HH:MM às HH:MM (atividades externas suspensas).'},
+  {code:12, title:'Falta de energia', model:'Interrupção de energia das HH:MM às HH:MM (frentes afetadas: ...).'},
+  {code:15, title:'Grua quebrada', model:'Grua quebrada das 07:00 às 16:00 (paralisação das operações de içamento).'},
+  {code:16, title:'Interdição de área', model:'Interdição de área por (motivo) das HH:MM às HH:MM.'},
+  {code:18, title:'Acidente/ocorrência', model:'Ocorrência/Acidente (descrever sucinto) das HH:MM às HH:MM.'},
+  {code:19, title:'Fiscalização/Paralisação', model:'Fiscalização/paralisação entre HH:MM e HH:MM (órgão: ...).'},
+  {code:20, title:'Dúvida técnica/Projeto', model:'Dúvida técnica de projeto (item) — aguardando definição.'},
+  {code:22, title:'Falta de água', model:'Interrupção de água das HH:MM às HH:MM (atividades afetadas).'},
   {code:25, title:'Problema logístico/acesso', model:'Dificuldade de acesso/logística (especificar) — janela HH:MM–HH:MM.'},
-  {code:26, title:'Vistoria externa',          model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
-  {code:28, title:'Greve/Manifestação',        model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
+  {code:26, title:'Vistoria externa', model:'Vistoria externa (quem) entre HH:MM e HH:MM.'},
+  {code:28, title:'Greve/Manifestação', model:'Greve/manifestação (onde) — impacto nas frentes: ...'}
 ];
 
 const FUNCOES = [
@@ -290,7 +304,6 @@ const FUNCOES = [
 
 const toInt = v => parseInt(v,10)||0;
 
-/* ======= SOMATÓRIOS ======= */
 function atualizarLinha(tr){
   const pre = toInt(tr.querySelector('input[data-tipo="presente"]').value);
   const aus = toInt(tr.querySelector('input[data-tipo="ausente"]').value);
@@ -301,20 +314,7 @@ function totalGeral(){ let s=0; document.querySelectorAll('.total-funcao').forEa
 function totalAusentesInformados(){ let s=0; document.querySelectorAll('input[data-tipo="ausente"]').forEach(i=>s+=toInt(i.value)); return s; }
 function renderTotalGeral(){ document.getElementById('totalGeral').textContent = totalGeral(); }
 
-/* ======= AUSENTES ======= */
 function optFuncoesHTML(){ return FUNCOES.map(f=>`<option value="${f}">${f}</option>`).join(''); }
-
-function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
-  if(!funcaoRaw) return;
-  const alvo = funcaoRaw.toString().trim().toUpperCase();
-  if(!alvo) return;
-  const options = Array.from(selectFunc.options);
-  const match = options.find(o=>{
-    const txt = o.value.toUpperCase();
-    return txt===alvo || txt.startsWith(alvo+" ");
-  });
-  if(match) selectFunc.value = match.value;
-}
 
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
@@ -326,31 +326,26 @@ function wireChapaAutocomplete(tr){
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
-      // ✅ busca por prefixo/consulta (já existe)
       const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(chapa)}`, { credentials:'include' });
       if(r.ok){
         const lista = await r.json();
         const f = Array.isArray(lista) ? lista.find(x => String(x.chapa).trim() === chapa) : null;
-
         if(f){
           inputNome.value = f.nome || inputNome.value;
-          if(f.funcao) aplicarFuncaoSimplificada(selectFunc, f.funcao);
+          if(f.funcao) selectFunc.value = FUNCOES.includes(f.funcao) ? f.funcao : selectFunc.value;
         } else {
-          // fallback: se tiver label no datalist
           const optDl = Array.from(dl.options).find(o=>o.value===chapa);
           if(optDl && optDl.label) inputNome.value = optDl.label;
         }
       }
-    }catch(err){
-      console.error(err);
-    }
+    }catch(e){}
   });
 
-  let autocompTimer=null;
+  let timer=null;
   inputChapa.addEventListener('input', ()=>{
-    const term = inputChapa.value.trim();
-    if(autocompTimer) clearTimeout(autocompTimer);
-    autocompTimer = setTimeout(async ()=>{
+    const term=inputChapa.value.trim();
+    if(timer) clearTimeout(timer);
+    timer=setTimeout(async ()=>{
       if(!term){ dl.innerHTML=''; return; }
       try{
         const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`, { credentials:'include' });
@@ -358,43 +353,28 @@ function wireChapaAutocomplete(tr){
         dl.innerHTML = (Array.isArray(lista)?lista:[])
           .map(p => `<option value="${p.chapa}" label="${(p.nome||'').replace(/"/g,'&quot;')}"></option>`)
           .join('');
-      }catch(err){
-        console.error(err);
-        dl.innerHTML='';
-      }
+      }catch(e){ dl.innerHTML=''; }
     },200);
   });
 }
 
 function novaLinhaAusente(){
   const tr=document.createElement('tr');
-  const uid = 'dl_' + Math.random().toString(36).slice(2,8);
+  const uid='dl_'+Math.random().toString(36).slice(2,8);
   tr.innerHTML=`
     <td>
       <input type="text" name="aus_chapa" placeholder="Ex: 012345" maxlength="20" list="${uid}" />
       <datalist id="${uid}"></datalist>
     </td>
-    <td><input type="text" name="aus_nome"  placeholder="Nome completo" /></td>
+    <td><input type="text" name="aus_nome" placeholder="Nome completo" /></td>
     <td><select name="aus_funcao"><option value="" disabled selected>Selecione...</option>${optFuncoesHTML()}</select></td>
-    <td><button type="button" class="btn btn-sm del">Remover</button></td>`;
+    <td><button type="button" class="btn btn-sm del">Remover</button></td>
+  `;
   wireChapaAutocomplete(tr);
   return tr;
 }
 
-function contarAusentesListadosValidos(){
-  // ✅ conta só linhas realmente preenchidas (chapa+nome+funcao)
-  let n=0;
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
-    const c=tr.querySelector('[name="aus_chapa"]').value.trim();
-    const nm=tr.querySelector('[name="aus_nome"]').value.trim();
-    const fu=tr.querySelector('[name="aus_funcao"]').value;
-    if(c && nm && fu) n++;
-  });
-  return n;
-}
-
 function contarAusentesListadosQualquer(){
-  // só pra badge (qualquer coisa preenchida)
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     const c=tr.querySelector('[name="aus_chapa"]').value.trim();
@@ -404,16 +384,23 @@ function contarAusentesListadosQualquer(){
   });
   return n;
 }
-
+function contarAusentesListadosValidos(){
+  let n=0;
+  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+    const c=tr.querySelector('[name="aus_chapa"]').value.trim();
+    const nm=tr.querySelector('[name="aus_nome"]').value.trim();
+    const fu=tr.querySelector('[name="aus_funcao"]').value;
+    if(c && nm && fu) n++;
+  });
+  return n;
+}
 function atualizarBadgeAusentes(){
   const list=contarAusentesListadosQualquer(), inf=totalAusentesInformados();
   const b=document.getElementById('badgeResumo');
   b.textContent=`Listados: ${list} • Informados: ${inf}`;
   b.className='pill '+(list===inf?'ok':'warn');
-  b.title=list===inf?'Quantidade confere.':'Atenção: diferença entre listados e informados.';
 }
 
-/* ======= INTERCORRÊNCIAS ======= */
 const dlCodigos=document.getElementById('listaCodigos');
 const catBody=document.getElementById('catalogoBody');
 
@@ -425,8 +412,9 @@ function novaLinhaInter(cod="",desc=""){
   const tr=document.createElement('tr');
   tr.innerHTML=`
     <td><input type="text" name="inter_codigo" data-kind="codigo" inputmode="numeric" pattern="\\d+" list="listaCodigos" placeholder="Ex: 15" value="${cod}"></td>
-    <td><textarea name="inter_desc" placeholder="Ex.: grua quebrada das 07:00 às 16:00">${desc}</textarea></td>
-    <td><button type="button" class="btn btn-sm del">Remover</button></td>`;
+    <td><textarea name="inter_desc" placeholder="Descreva...">${desc}</textarea></td>
+    <td><button type="button" class="btn btn-sm del">Remover</button></td>
+  `;
   return tr;
 }
 function contarInter(){ return document.querySelectorAll('#tbodyInter tr').length; }
@@ -443,7 +431,6 @@ function atualizarBadgeInter(){
   const b=document.getElementById('badgeInter');
   b.textContent=`Itens: ${itens} • Duplicados: ${dups}`;
   b.className='pill '+(dups===0?'ok':'warn');
-  b.title=dups===0?'Sem códigos duplicados.':'Existem códigos duplicados.';
 }
 function autoDescricaoPorCodigo(inputCodigo){
   const tr=inputCodigo.closest('tr');
@@ -454,7 +441,6 @@ function autoDescricaoPorCodigo(inputCodigo){
   if(item && (!desc.value || desc.value.trim()==="")) desc.value=`${item.title} — ${item.model}`;
 }
 
-/* ======= EVENTOS ======= */
 document.getElementById('tbody').addEventListener('input', e=>{
   if(e.target.matches('input[type="number"]')){
     atualizarLinha(e.target.closest('tr'));
@@ -467,17 +453,11 @@ document.getElementById('limpar').addEventListener('click', ()=>{
   document.querySelectorAll('#diarioForm input[type="number"]').forEach(i=>i.value=0);
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
   renderTotalGeral();
-
-  document.querySelector('[name="obra"]').value='';
-  // NÃO limpamos o responsável automático (fica preenchido)
-  document.querySelector('[name="data"]').value='';
-  document.querySelector('[name="observacoes"]').value='';
-
   document.getElementById('tbodyAusentes').innerHTML='';
   document.getElementById('tbodyInter').innerHTML='';
-
-  atualizarBadgeAusentes();
-  atualizarBadgeInter();
+  document.querySelector('[name="data"]').value='';
+  document.querySelector('[name="observacoes"]').value='';
+  atualizarBadgeAusentes(); atualizarBadgeInter();
   esconderErro();
 });
 
@@ -485,7 +465,6 @@ document.getElementById('addAusente').addEventListener('click', ()=>{
   document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente());
   atualizarBadgeAusentes();
 });
-
 document.getElementById('tbodyAusentes').addEventListener('click', e=>{
   if(e.target.closest('.del')){
     e.target.closest('tr').remove();
@@ -513,56 +492,29 @@ document.getElementById('tbodyInter').addEventListener('input', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
   if(e.target.name==='inter_desc'){ atualizarBadgeInter(); }
 });
-document.getElementById('tbodyInter').addEventListener('change', e=>{
-  if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
-});
-
-// Toggle catálogo
 document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
-  const box = document.getElementById('catalogo');
-  box.style.display = (box.style.display === 'block') ? 'none' : 'block';
+  const box=document.getElementById('catalogo');
+  box.style.display = (box.style.display==='block')?'none':'block';
 });
 
-/* ======= INIT ======= */
-window.addEventListener('DOMContentLoaded', async ()=>{
-  await carregarUsuarioEPreencherResponsavel();
-  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
-  renderTotalGeral();
-  atualizarBadgeAusentes();
-  renderCatalogo();
-  atualizarBadgeInter();
-});
-
-/* ======= UI erro ======= */
-function mostrarErro(msg){
-  const box = document.getElementById('errorBox');
-  box.textContent = msg;
-  box.style.display = 'block';
-  box.scrollIntoView({ behavior:'smooth', block:'center' });
-}
-function esconderErro(){
-  const box = document.getElementById('errorBox');
-  box.textContent = '';
-  box.style.display = 'none';
-}
-
-/* ======= INTEGRAÇÃO COM O BACKEND ======= */
 function coletarPayload(){
   const obra        = document.querySelector('[name="obra"]').value.trim();
   const responsavel = document.querySelector('[name="responsavel"]').value.trim();
   const data        = document.querySelector('[name="data"]').value;
   const observacoes = document.querySelector('[name="observacoes"]').value.trim();
 
-  const funcoes=[]; document.querySelectorAll('#tbody tr').forEach(tr=>{
+  const funcoes=[];
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
     funcoes.push({
       funcao: tr.querySelector('.fun').textContent.trim(),
-      presente: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
-      ausente:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
-      ferias:   parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
+      presente: toInt(tr.querySelector('input[data-tipo="presente"]').value),
+      ausente:  toInt(tr.querySelector('input[data-tipo="ausente"]').value),
+      ferias:   toInt(tr.querySelector('input[data-tipo="ferias"]').value),
     });
   });
 
-  const ausentes=[]; document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+  const ausentes=[];
+  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     ausentes.push({
       chapa: tr.querySelector('[name="aus_chapa"]').value.trim(),
       nome: tr.querySelector('[name="aus_nome"]').value.trim(),
@@ -570,7 +522,8 @@ function coletarPayload(){
     });
   });
 
-  const intercorrencias=[]; document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
+  const intercorrencias=[];
+  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
     intercorrencias.push({
       codigo: tr.querySelector('[name="inter_codigo"]').value.trim(),
       descricao: tr.querySelector('[name="inter_desc"]').value.trim()
@@ -586,29 +539,19 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
 
   const payload = coletarPayload();
 
-  const erros = [];
-  if(!payload.obra)        erros.push('• Informe a obra.');
-  if(!payload.responsavel) erros.push('• Informe o responsável (preenchido automaticamente, mas pode editar).');
-  if(!payload.data)        erros.push('• Informe a data.');
+  const erros=[];
+  if(!payload.obra) erros.push('• Selecione a obra.');
+  if(!payload.responsavel) erros.push('• Informe o responsável.');
+  if(!payload.data) erros.push('• Informe a data.');
 
-  // intercorrências: pelo menos 1 (código 0 quando não houver)
   const interValidas = payload.intercorrencias.filter(i => i.codigo || i.descricao);
-  if(interValidas.length===0){
-    erros.push('• Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto).');
-  }
+  if(interValidas.length===0) erros.push('• Informe pelo menos uma intercorrência (use o código 0 quando não houver).');
   payload.intercorrencias = interValidas;
 
-  // ✅ Regra 2: se informou X ausentes por função, precisa ter X ausentes identificados completos
-  const ausentesInformados = totalAusentesInformados();
-  const ausentesIdentificadosCompletos = contarAusentesListadosValidos();
-
-  if(ausentesInformados > 0){
-    if(ausentesIdentificadosCompletos !== ausentesInformados){
-      erros.push(
-        `• Você informou ${ausentesInformados} AUSENTE(S) por função, mas identificou ${ausentesIdentificadosCompletos} na lista.\n`+
-        `  → A lista de ausentes deve ter a MESMA quantidade e cada linha precisa ter CHAPA + NOME + FUNÇÃO.`
-      );
-    }
+  const ausInf = totalAusentesInformados();
+  const ausOk  = contarAusentesListadosValidos();
+  if(ausInf > 0 && ausOk !== ausInf){
+    erros.push(`• Você informou ${ausInf} AUSENTE(S) por função, mas identificou ${ausOk} na lista (chapa+nome+função).`);
   }
 
   if(erros.length){
@@ -625,16 +568,23 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
     });
     const json = await resp.json();
     if(!resp.ok){
-      mostrarErro('Erro ao salvar: ' + (json.error || 'Falha ao salvar'));
+      mostrarErro('Erro: '+(json.error||'Falha ao salvar'));
       return;
     }
     alert('Diário salvo com ID #'+json.id);
-    // opcional: ir pra index
-    // location.href = 'index.html';
   }catch(err){
-    console.error(err);
     mostrarErro('Não foi possível conectar ao servidor.');
   }
+});
+
+window.addEventListener('DOMContentLoaded', async ()=>{
+  await carregarUsuario();
+  await carregarObras();
+  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
+  renderTotalGeral();
+  atualizarBadgeAusentes();
+  renderCatalogo();
+  atualizarBadgeInter();
 });
 </script>
 </body>
