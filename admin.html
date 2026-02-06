@@ -1,417 +1,546 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin • Diário de Obra</title>
-  <style>
-    :root{
-      --bg:#f4f6fb; --card:#ffffff; --prim:#3A6385; --prim-dark:#284666;
-      --muted:#7b8794; --border:#e2e8f0; --danger:#e53e3e; --ok:#1b8a5a;
+// server.js
+// Diário de Obra – API (Express + better-sqlite3)
+// -----------------------------------------------
+
+const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
+const Database = require('better-sqlite3');
+
+const app = express();
+
+// -------------------------
+// Configurações básicas
+// -------------------------
+const PORT = process.env.PORT || 10000;
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-diario-obra';
+
+// Middlewares
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 12, // 12h
+    },
+  })
+);
+
+// Conteúdo estático (HTML/JS/CSS)
+app.use(express.static(path.join(__dirname)));
+
+// -------------------------
+// Banco de dados (SQLite)
+// -------------------------
+const DB_FILE = path.join(__dirname, 'diario_obra.db');
+const db = new Database(DB_FILE);
+
+// Criação de tabelas
+db.exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('admin','engenheiro','apontador')),
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS obras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT UNIQUE NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS diarios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  data TEXT NOT NULL,              -- ISO: YYYY-MM-DD
+  obra TEXT NOT NULL,
+  responsavel TEXT NOT NULL,
+  observacoes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS funcoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  diario_id INTEGER NOT NULL,
+  funcao TEXT NOT NULL,
+  presentes INTEGER NOT NULL DEFAULT 0,
+  ausentes  INTEGER NOT NULL DEFAULT 0,
+  ferias    INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS intercorrencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  diario_id INTEGER NOT NULL,
+  codigo TEXT NOT NULL,
+  descricao TEXT,
+  FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ausentes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  diario_id INTEGER NOT NULL,
+  chapa TEXT,
+  nome TEXT,
+  funcao TEXT,
+  FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
+);
+`);
+
+// Índices
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_diarios_data         ON diarios(data);
+CREATE INDEX IF NOT EXISTS idx_funcoes_diario       ON funcoes(diario_id);
+CREATE INDEX IF NOT EXISTS idx_intercorrencias_did  ON intercorrencias(diario_id);
+CREATE INDEX IF NOT EXISTS idx_intercorrencias_cod  ON intercorrencias(codigo);
+CREATE INDEX IF NOT EXISTS idx_ausentes_diario      ON ausentes(diario_id);
+CREATE INDEX IF NOT EXISTS idx_obras_nome           ON obras(nome);
+`);
+
+// Seeds de usuários
+function ensureUser(email, pass, role) {
+  const row = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  if (!row) {
+    const hash = bcrypt.hashSync(pass, 10);
+    db.prepare(
+      'INSERT INTO users(email, password_hash, role, active) VALUES (?, ?, ?, 1)'
+    ).run(email, hash, role);
+    console.log(`Seed user criado: ${email} / ${pass} (${role})`);
+  }
+}
+ensureUser('admin@obra.local', 'admin123', 'admin');
+ensureUser('engenheiro@obra.local', '123456', 'engenheiro');
+ensureUser('apontador@obra.local', '123456', 'apontador');
+
+// --------------------------------------------------
+// Carregamento do CSV de funcionários em memória
+// --------------------------------------------------
+/**
+ * Espera CSV com cabeçalho: chapa;nome;funcao (ou vírgula)
+ * Exemplo:
+ *   20019;JOSE HADONIAS ALVES PINHEIRO;CARPINTEIRO
+ */
+const funcionarios = [];
+(function loadFuncionarios() {
+  try {
+    const csvPath = path.join(__dirname, 'funcionarios.csv');
+    if (!fs.existsSync(csvPath)) {
+      console.warn('Nenhum arquivo funcionarios.csv encontrado na pasta do projeto.');
+      return;
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#102a43}
-    header{
-      background:#fff;border-bottom:1px solid var(--border);
-      padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
-      position:sticky;top:0;z-index:10
-    }
-    header h1{margin:0;font-size:18px;font-weight:800}
-    header small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-    .user-area{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
-    .btn{
-      padding:8px 14px;border-radius:8px;border:none;cursor:pointer;
-      font-size:14px;background:var(--prim);color:#fff
-    }
-    .btn:hover{background:var(--prim-dark)}
-    .btn-outline{background:#fff;color:var(--prim);border:1px solid var(--prim)}
-    .btn-outline:hover{background:var(--prim);color:#fff}
-    .btn-danger{background:var(--danger)}
-    .btn-danger:hover{filter:brightness(.95)}
-    .btn-sm{padding:6px 10px;font-size:12px;border-radius:7px}
-    .btn-ghost{background:#eef2f6;color:#233}
-    .btn-ghost:hover{filter:brightness(.98)}
-    .btn-disabled{opacity:.55;pointer-events:none}
-
-    main{max-width:1100px;margin:24px auto 40px;padding:0 16px}
-    .card{
-      background:var(--card);border-radius:12px;border:1px solid var(--border);
-      box-shadow:0 8px 24px rgba(15,23,42,.06);padding:16px 18px 18px;margin-bottom:18px
-    }
-    h2{margin:0 0 10px;font-size:16px}
-    p{margin:6px 0 14px;color:var(--muted);font-size:13px}
-
-    .grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;align-items:end}
-    @media(max-width:900px){.grid{grid-template-columns:1fr}}
-    label{font-size:12px;color:var(--muted);margin-bottom:4px;display:block}
-    input,select{
-      width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--border);
-      font-size:14px;outline:none;background:#fff
-    }
-    input:focus,select:focus{border-color:var(--prim);box-shadow:0 0 0 3px rgba(58,99,133,.12)}
-    input[disabled], select[disabled]{background:#f8fafc;color:#66758a}
-    .row-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
-
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    thead th{background:var(--prim);color:#fff;padding:10px 8px;text-align:left}
-    tbody td{border-bottom:1px solid var(--border);padding:8px 8px;vertical-align:middle}
-    tbody tr:nth-child(even){background:#f8fafc}
-
-    .pill{
-      display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;
-      border:1px solid var(--border);font-size:12px;background:#f8fafc;color:#233
-    }
-    .msg{
-      display:none;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
-      font-size:13px;background:#fff
-    }
-    .msg.ok{border-color:#cdeedd;background:#eaf7f0;color:#0f5132}
-    .msg.err{border-color:#fed7d7;background:#fff5f5;color:#8a1f1f}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:12px}
-    .actions-cell{display:flex;gap:6px;flex-wrap:wrap}
-    .w80{width:80px}
-    .w120{width:120px}
-    .w140{width:140px}
-  </style>
-</head>
-<body>
-<header>
-  <div>
-    <h1>Administração</h1>
-    <small>Gerencie usuários e permissões</small>
-  </div>
-  <div class="user-area">
-    <span id="userGreeting">Olá, …</span>
-    <a class="btn btn-outline" href="/">Início</a>
-    <button id="btnLogout" class="btn btn-outline">Sair</button>
-  </div>
-</header>
-
-<main>
-  <section class="card">
-    <h2>Novo usuário</h2>
-    <p>Perfis: <span class="pill">admin</span> <span class="pill">engenheiro</span> <span class="pill">curadoria</span> <span class="pill">apontador</span></p>
-
-    <div class="grid">
-      <div>
-        <label for="newEmail">E-mail (login)</label>
-        <input id="newEmail" type="email" placeholder="ex: fulano@obra.local" />
-      </div>
-      <div>
-        <label for="newPass">Senha</label>
-        <input id="newPass" type="text" placeholder="Senha inicial" />
-      </div>
-      <div>
-        <label for="newRole">Perfil</label>
-        <select id="newRole">
-          <option value="apontador">apontador</option>
-          <option value="curadoria">curadoria</option>
-          <option value="engenheiro">engenheiro</option>
-          <option value="admin">admin</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row-actions">
-      <button id="btnCreate" class="btn">Criar usuário</button>
-    </div>
-
-    <div id="msgCreate" class="msg"></div>
-  </section>
-
-  <section class="card">
-    <h2>Usuários cadastrados</h2>
-    <p>Acesso restrito a administradores.</p>
-
-    <div id="msgList" class="msg"></div>
-
-    <div style="overflow:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th class="w80">ID</th>
-            <th>E-mail</th>
-            <th class="w140">Perfil</th>
-            <th class="w120">Ativo</th>
-            <th class="w140">Criado em</th>
-            <th class="w140">Nova Senha</th>
-            <th class="w140">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="tbodyUsers"></tbody>
-      </table>
-    </div>
-  </section>
-</main>
-
-<script>
-  const $ = (id)=>document.getElementById(id);
-
-  let CURRENT_USER = null;
-
-  function showMsg(el, type, text){
-    el.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
-    el.textContent = text;
-    el.style.display = 'block';
-  }
-  function clearMsg(el){
-    el.style.display = 'none';
-    el.textContent = '';
-    el.className = 'msg';
-  }
-
-  async function ensureAdmin(){
-    const r = await fetch('/api/me', { credentials:'include' });
-    const j = await r.json();
-    const user = j.user || null;
-    if(!user){ location.href='/login.html?next=/admin.html'; return null; }
-    if(user.role !== 'admin'){ alert('Acesso restrito a administradores.'); location.href='/'; return null; }
-    CURRENT_USER = user;
-    $('userGreeting').textContent = `Olá, ${(user.email||'').split('@')[0] || 'admin'}`;
-    return user;
-  }
-
-  async function logout(){
-    try{ await fetch('/api/logout',{ method:'POST', credentials:'include' }); }
-    finally{ location.href='/login.html'; }
-  }
-
-  function roleSelectHtml(selected){
-    const roles = ['apontador','curadoria','engenheiro','admin'];
-    return roles.map(r=>`<option value="${r}" ${r===selected?'selected':''}>${r}</option>`).join('');
-  }
-
-  function setRowEditing(tr, editing){
-    tr.dataset.editing = editing ? '1' : '0';
-    const roleEl = tr.querySelector('select[data-role]');
-    const actEl  = tr.querySelector('select[data-active]');
-    const passEl = tr.querySelector('input[data-pass]');
-
-    roleEl.disabled = !editing;
-    actEl.disabled  = !editing;
-    passEl.disabled = !editing;
-
-    const btnEdit = tr.querySelector('button[data-edit]');
-    const btnSave = tr.querySelector('button[data-save]');
-    const btnCancel = tr.querySelector('button[data-cancel]');
-
-    btnEdit.style.display = editing ? 'none' : 'inline-block';
-    btnSave.style.display = editing ? 'inline-block' : 'none';
-    btnCancel.style.display = editing ? 'inline-block' : 'none';
-  }
-
-  function snapshotRow(tr){
-    tr.dataset.snapRole = tr.querySelector('select[data-role]').value;
-    tr.dataset.snapActive = tr.querySelector('select[data-active]').value;
-    tr.dataset.snapPass = '';
-    tr.querySelector('input[data-pass]').value = '';
-  }
-
-  function restoreRow(tr){
-    tr.querySelector('select[data-role]').value = tr.dataset.snapRole || 'apontador';
-    tr.querySelector('select[data-active]').value = tr.dataset.snapActive || '1';
-    tr.querySelector('input[data-pass]').value = '';
-  }
-
-  async function loadUsers(){
-    const tbody = $('tbodyUsers');
-    const msg = $('msgList');
-    clearMsg(msg);
-    tbody.innerHTML = '';
-
-    try{
-      const r = await fetch('/api/users', { credentials:'include' });
-      const data = await r.json().catch(()=>null);
-
-      if(!r.ok){
-        showMsg(msg, 'err', (data && data.error) ? data.error : 'Falha ao carregar usuários.');
-        return;
+    const raw = fs.readFileSync(csvPath, 'utf8');
+    const linhas = raw.split(/\r?\n/);
+    let l = 0;
+    for (const ln of linhas) {
+      const line = ln.trim();
+      if (!line) continue;
+      l++;
+      if (l === 1 && /chapa/i.test(line) && /nome/i.test(line)) {
+        continue;
       }
+      const parts = line.split(/[;,]/).map(s => s.trim());
+      if (parts.length < 3) continue;
+      const [chapa, nome, funcao] = parts;
+      if (!chapa) continue;
+      funcionarios.push({
+        chapa: String(chapa).trim(),
+        nome: (nome || '').trim(),
+        funcao: (funcao || '').trim(),
+      });
+    }
+    console.log(`Carregados ${funcionarios.length} funcionários de ${csvPath}`);
+  } catch (e) {
+    console.error('Erro lendo funcionarios.csv:', e);
+  }
+})();
 
-      (data || []).forEach(u=>{
-        const tr = document.createElement('tr');
+// --------------------------------------------------
+// Helpers de autenticação/autorização
+// --------------------------------------------------
+function requireLogin(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Não autenticado' });
+  }
+  next();
+}
+function requireAdmin(req, res, next) {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso restrito a administradores.' });
+  }
+  next();
+}
+function requireEngenharia(req, res, next) {
+  if (!req.session.user) return res.status(401).json({ error: 'Não autenticado' });
+  if (!['admin', 'engenheiro'].includes(req.session.user.role)) {
+    return res.status(403).json({ error: 'Acesso restrito à engenharia.' });
+  }
+  next();
+}
 
-        tr.innerHTML = `
-          <td>${u.id}</td>
-          <td>${u.email}</td>
-          <td><select data-role="${u.id}" disabled>${roleSelectHtml(u.role)}</select></td>
-          <td>
-            <select data-active="${u.id}" disabled>
-              <option value="1" ${u.active ? 'selected':''}>Sim</option>
-              <option value="0" ${!u.active ? 'selected':''}>Não</option>
-            </select>
-          </td>
-          <td class="mono">${u.created_at || ''}</td>
-          <td><input data-pass="${u.id}" type="text" placeholder="(opcional)" disabled /></td>
-          <td class="actions-cell">
-            <button class="btn btn-sm btn-ghost" data-edit="${u.id}">Editar</button>
-            <button class="btn btn-sm" data-save="${u.id}" style="display:none;">Salvar</button>
-            <button class="btn btn-sm btn-ghost" data-cancel="${u.id}" style="display:none;">Cancelar</button>
-            <button class="btn btn-sm btn-danger" data-del="${u.id}">Excluir</button>
-          </td>
-        `;
+// --------------------------------------------------
+// Rotas de sessão / usuários
+// --------------------------------------------------
+app.post('/api/login', (req, res) => {
+  const { email, senha } = req.body || {};
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Informe email e senha.' });
+  }
+  const u = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
+  if (!u) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+  const ok = bcrypt.compareSync(String(senha), u.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
 
-        // bloqueia exclusão do próprio admin na UI (server também bloqueia)
-        if (CURRENT_USER && Number(u.id) === Number(CURRENT_USER.id)) {
-          const delBtn = tr.querySelector('button[data-del]');
-          delBtn.classList.add('btn-disabled');
-          delBtn.title = 'Você não pode excluir seu próprio usuário.';
+  req.session.user = { id: u.id, email: u.email, role: u.role };
+  return res.json({ ok: true, user: { email: u.email, role: u.role } });
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.get('/api/me', (req, res) => {
+  if (!req.session.user) return res.json({ user: null });
+  res.json({ user: req.session.user });
+});
+
+// Administração de usuários
+app.get('/api/users', requireAdmin, (req, res) => {
+  const rows = db.prepare('SELECT id,email,role,active,created_at FROM users ORDER BY id').all();
+  res.json(rows);
+});
+
+app.post('/api/users', requireAdmin, (req, res) => {
+  const { email, senha, role } = req.body || {};
+  if (!email || !senha || !role) {
+    return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
+  }
+  try {
+    const hash = bcrypt.hashSync(senha, 10);
+    db.prepare('INSERT INTO users(email,password_hash,role,active) VALUES(?,?,?,1)')
+      .run(email, hash, role);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Não foi possível criar o usuário.' });
+  }
+});
+
+app.patch('/api/users/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { role, active, senha } = req.body || {};
+  try {
+    if (senha) {
+      const hash = bcrypt.hashSync(senha, 10);
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
+    }
+    if (role) {
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+    }
+    if (typeof active !== 'undefined') {
+      db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao atualizar usuário.' });
+  }
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao excluir usuário.' });
+  }
+});
+
+// --------------------------------------------------
+// ✅ OBRAS (cadastro pelo Admin + listagem para o Form)
+// --------------------------------------------------
+
+// Listar obras (qualquer usuário logado pode ver para preencher o form)
+app.get('/api/obras', requireLogin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, nome, active, created_at
+    FROM obras
+    WHERE active = 1
+    ORDER BY LOWER(nome)
+  `).all();
+  res.json(rows);
+});
+
+// Listar todas (admin)
+app.get('/api/obras/all', requireAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, nome, active, created_at
+    FROM obras
+    ORDER BY active DESC, LOWER(nome)
+  `).all();
+  res.json(rows);
+});
+
+// Criar obra (admin)
+app.post('/api/obras', requireAdmin, (req, res) => {
+  const { nome } = req.body || {};
+  const nm = String(nome || '').trim();
+  if (!nm) return res.status(400).json({ error: 'Informe o nome da obra.' });
+
+  try {
+    db.prepare('INSERT INTO obras(nome, active) VALUES(?, 1)').run(nm);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Não foi possível cadastrar a obra (talvez já exista).' });
+  }
+});
+
+// Atualizar obra (admin) - renomear e/ou ativar/desativar
+app.patch('/api/obras/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { nome, active } = req.body || {};
+
+  try {
+    if (typeof nome !== 'undefined') {
+      const nm = String(nome || '').trim();
+      if (!nm) return res.status(400).json({ error: 'Nome inválido.' });
+      db.prepare('UPDATE obras SET nome = ? WHERE id = ?').run(nm, id);
+    }
+    if (typeof active !== 'undefined') {
+      db.prepare('UPDATE obras SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao atualizar obra.' });
+  }
+});
+
+// Excluir obra (admin)
+app.delete('/api/obras/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    db.prepare('DELETE FROM obras WHERE id = ?').run(id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao excluir obra.' });
+  }
+});
+
+// --------------------------------------------------
+// Funcionários (auto-complete por chapa / prefixo)
+// --------------------------------------------------
+app.get('/api/funcionarios', requireLogin, (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+  const isDigits = /^\d+$/.test(q);
+
+  let matches = funcionarios.filter(f => f.chapa.startsWith(q));
+  if (matches.length === 0 && !isDigits) {
+    const qLower = q.toLowerCase();
+    matches = funcionarios.filter(f => f.nome.toLowerCase().includes(qLower));
+  }
+  res.json(matches.slice(0, 30));
+});
+
+// --------------------------------------------------
+// Diários – criação e leitura
+// --------------------------------------------------
+app.post('/api/diarios', requireLogin, (req, res) => {
+  try {
+    const {
+      data,
+      obra,
+      responsavel,
+      observacoes,
+      funcoes = [],
+      intercorrencias = [],
+      ausentes = [], // ✅ agora salva ausentes individualizados
+    } = req.body || {};
+
+    if (!data || !obra || !responsavel) {
+      return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
+    }
+
+    const insD = db.prepare(
+      `INSERT INTO diarios(data,obra,responsavel,observacoes) VALUES (?,?,?,?)`
+    );
+    const info = insD.run(data, obra, responsavel, observacoes || null);
+    const diarioId = info.lastInsertRowid;
+
+    const insF = db.prepare(
+      `INSERT INTO funcoes(diario_id,funcao,presentes,ausentes,ferias) VALUES (?,?,?,?,?)`
+    );
+    for (const f of funcoes) {
+      insF.run(
+        diarioId,
+        (f.funcao || '').trim(),
+        Number(f.presente || f.presentes || 0),
+        Number(f.ausente || f.ausentes || 0),
+        Number(f.ferias || 0)
+      );
+    }
+
+    const insI = db.prepare(
+      `INSERT INTO intercorrencias(diario_id,codigo,descricao) VALUES (?,?,?)`
+    );
+    for (const i of intercorrencias) {
+      if (!i || (!i.codigo && !i.descricao)) continue;
+      insI.run(diarioId, String(i.codigo || '').trim(), (i.descricao || '').trim());
+    }
+
+    const insA = db.prepare(
+      `INSERT INTO ausentes(diario_id,chapa,nome,funcao) VALUES (?,?,?,?)`
+    );
+    for (const a of ausentes) {
+      const chapa = (a?.chapa || '').trim();
+      const nome  = (a?.nome || '').trim();
+      const func  = (a?.funcao || '').trim();
+      if (!chapa && !nome && !func) continue;
+      insA.run(diarioId, chapa || null, nome || null, func || null);
+    }
+
+    res.json({ ok: true, id: diarioId });
+  } catch (e) {
+    console.error('POST /api/diarios erro:', e);
+    res.status(500).json({ error: 'Falha ao salvar diário.' });
+  }
+});
+
+// LISTA DIÁRIOS (com filtro)
+app.get('/api/diarios', requireLogin, (req, res) => {
+  try {
+    const obra = (req.query.obra || '').trim();
+    const responsavel = (req.query.responsavel || '').trim();
+
+    const codigoParam =
+      (req.query.codigo_intercorrencia ||
+        req.query.codigo ||
+        req.query.cod ||
+        req.query.intercorrencia ||
+        '').trim();
+    const codigo = codigoParam || null;
+
+    const dataDe = (req.query.dataDe || req.query.data_de || '').trim();
+    const dataAte = (req.query.dataAte || req.query.data_ate || '').trim();
+
+    let sql = `
+      SELECT
+        d.id,
+        d.data,
+        d.obra,
+        d.responsavel,
+        COALESCE(SUM(f.presentes), 0) AS presentes,
+        COALESCE(SUM(f.ausentes),  0) AS ausentes,
+        COALESCE(SUM(f.ferias),    0) AS ferias
+      FROM diarios d
+      LEFT JOIN funcoes f ON f.diario_id = d.id
+      WHERE 1=1
+    `;
+    const params = {};
+
+    if (obra) {
+      sql += ` AND LOWER(d.obra) LIKE LOWER(@obra) `;
+      params.obra = `%${obra}%`;
+    }
+    if (responsavel) {
+      sql += ` AND LOWER(d.responsavel) LIKE LOWER(@responsavel) `;
+      params.responsavel = `%${responsavel}%`;
+    }
+    if (dataDe) {
+      sql += ` AND DATE(d.data) >= DATE(@dataDe) `;
+      params.dataDe = dataDe;
+    }
+    if (dataAte) {
+      sql += ` AND DATE(d.data) <= DATE(@dataAte) `;
+      params.dataAte = dataAte;
+    }
+    if (codigo) {
+      sql += `
+        AND EXISTS (
+          SELECT 1
+          FROM intercorrencias ic
+          WHERE ic.diario_id = d.id
+            AND TRIM(ic.codigo) = TRIM(@codigo)
+        )
+      `;
+      params.codigo = codigo;
+    }
+
+    sql += `
+      GROUP BY d.id
+      ORDER BY DATE(d.data) DESC, d.id DESC
+    `;
+
+    const rows = db.prepare(sql).all(params);
+
+    const out = rows.map(r => {
+      let dataBr = '';
+      try {
+        const dt = new Date(r.data);
+        if (!isNaN(dt.getTime())) {
+          const dd = String(dt.getDate()).padStart(2, '0');
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const yy = dt.getFullYear();
+          dataBr = `${dd}/${mm}/${yy}`;
         }
+      } catch {}
+      return { ...r, dataBr };
+    });
 
-        tbody.appendChild(tr);
-
-        // estado inicial
-        setRowEditing(tr, false);
-
-        // handlers
-        tr.querySelector('button[data-edit]').addEventListener('click', ()=>{
-          snapshotRow(tr);
-          setRowEditing(tr, true);
-        });
-
-        tr.querySelector('button[data-cancel]').addEventListener('click', ()=>{
-          restoreRow(tr);
-          setRowEditing(tr, false);
-        });
-
-        tr.querySelector('button[data-save]').addEventListener('click', ()=>{
-          saveUser(u.id, tr);
-        });
-
-        tr.querySelector('button[data-del]').addEventListener('click', ()=>{
-          deleteUser(u.id, u.email);
-        });
-      });
-
-    }catch(e){
-      console.error(e);
-      showMsg(msg, 'err', 'Erro ao carregar usuários.');
-    }
+    res.json(out);
+  } catch (e) {
+    console.error('GET /api/diarios erro:', e);
+    res.status(500).json({ error: 'Falha ao listar diários.' });
   }
+});
 
-  async function createUser(){
-    const email = ($('newEmail').value || '').trim();
-    const senha = ($('newPass').value || '').trim();
-    const role  = $('newRole').value;
+// Detalhe de um diário (inclui ausentes individualizados)
+app.get('/api/diarios/:id', requireLogin, (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const d = db.prepare('SELECT * FROM diarios WHERE id = ?').get(id);
+    if (!d) return res.status(404).json({ error: 'Diário não encontrado.' });
 
-    const msg = $('msgCreate');
-    clearMsg(msg);
+    const fun = db.prepare(
+      'SELECT funcao,presentes,ausentes,ferias FROM funcoes WHERE diario_id = ? ORDER BY funcao'
+    ).all(id);
 
-    if(!email || !senha || !role){
-      showMsg(msg, 'err', 'Preencha e-mail, senha e perfil.');
-      return;
-    }
+    const inc = db.prepare(
+      'SELECT codigo,descricao FROM intercorrencias WHERE diario_id = ? ORDER BY id'
+    ).all(id);
 
-    try{
-      const r = await fetch('/api/users', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body: JSON.stringify({ email, senha, role })
-      });
-      const data = await r.json().catch(()=> ({}));
+    const aus = db.prepare(
+      'SELECT chapa,nome,funcao FROM ausentes WHERE diario_id = ? ORDER BY id'
+    ).all(id);
 
-      if(!r.ok){
-        showMsg(msg, 'err', data.error || 'Não foi possível criar o usuário.');
-        return;
-      }
-
-      showMsg(msg, 'ok', 'Usuário criado com sucesso!');
-      $('newEmail').value = '';
-      $('newPass').value = '';
-      $('newRole').value = 'apontador';
-
-      await loadUsers();
-
-    }catch(e){
-      console.error(e);
-      showMsg(msg, 'err', 'Erro de conexão ao criar usuário.');
-    }
+    res.json({ ...d, funcoes: fun, intercorrencias: inc, ausentes: aus });
+  } catch (e) {
+    console.error('GET /api/diarios/:id erro:', e);
+    res.status(500).json({ error: 'Falha ao buscar diário.' });
   }
+});
 
-  async function saveUser(id, tr){
-    const msg = $('msgList');
-    clearMsg(msg);
+// -----------------------------------------------
+// Fallback para arquivos HTML (roteamento simples)
+// -----------------------------------------------
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get('/form', requireLogin, (_req, res) => res.sendFile(path.join(__dirname, 'form.html')));
+app.get('/viewer', requireLogin, requireEngenharia, (_req, res) => res.sendFile(path.join(__dirname, 'viewer.html')));
+app.get('/admin.html', requireLogin, requireAdmin, (_req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-    const roleEl = tr.querySelector(`select[data-role="${id}"]`);
-    const actEl  = tr.querySelector(`select[data-active="${id}"]`);
-    const passEl = tr.querySelector(`input[data-pass="${id}"]`);
-
-    const role = roleEl ? roleEl.value : null;
-    const active = actEl ? (actEl.value === '1') : null;
-    const senha = passEl ? (passEl.value || '').trim() : '';
-
-    const payload = {};
-    if(role) payload.role = role;
-    if(active !== null) payload.active = active;
-    if(senha) payload.senha = senha;
-
-    try{
-      const r = await fetch(`/api/users/${id}`, {
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body: JSON.stringify(payload)
-      });
-      const data = await r.json().catch(()=> ({}));
-
-      if(!r.ok){
-        showMsg(msg, 'err', data.error || 'Falha ao atualizar usuário.');
-        return;
-      }
-
-      showMsg(msg, 'ok', 'Usuário atualizado.');
-      setRowEditing(tr, false);
-      await loadUsers();
-
-    }catch(e){
-      console.error(e);
-      showMsg(msg, 'err', 'Erro de conexão ao atualizar usuário.');
-    }
-  }
-
-  async function deleteUser(id, email){
-    const msg = $('msgList');
-    clearMsg(msg);
-
-    if (CURRENT_USER && Number(id) === Number(CURRENT_USER.id)) {
-      showMsg(msg, 'err', 'Você não pode excluir seu próprio usuário.');
-      return;
-    }
-
-    const ok = confirm(`Excluir o usuário:\n\n${email}\n\nEssa ação não pode ser desfeita.`);
-    if(!ok) return;
-
-    try{
-      const r = await fetch(`/api/users/${id}`, {
-        method:'DELETE',
-        credentials:'include'
-      });
-      const data = await r.json().catch(()=> ({}));
-
-      if(!r.ok){
-        showMsg(msg, 'err', data.error || 'Falha ao excluir usuário.');
-        return;
-      }
-
-      showMsg(msg, 'ok', 'Usuário excluído.');
-      await loadUsers();
-
-    }catch(e){
-      console.error(e);
-      showMsg(msg, 'err', 'Erro de conexão ao excluir usuário.');
-    }
-  }
-
-  window.addEventListener('DOMContentLoaded', async ()=>{
-    const ok = await ensureAdmin();
-    if(!ok) return;
-
-    $('btnLogout').addEventListener('click', logout);
-    $('btnCreate').addEventListener('click', createUser);
-
-    await loadUsers();
-  });
-</script>
-</body>
-</html>
+// -------------------------
+// Inicialização do servidor
+// -------------------------
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`--> http://localhost:${PORT}`);
+});
