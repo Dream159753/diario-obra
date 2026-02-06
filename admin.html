@@ -1,236 +1,137 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Admin - Usuários Diário de Obra</title>
-<style>
-  :root {
-    --prim:#3A6385;
-    --muted:#66758a;
-    --ok:#1b8a5a;
-    --warn:#c0392b;
-    --bg:#f4f6f9;
-  }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0;
-    font-family: Arial, sans-serif;
-    background:var(--bg);
-    color:#233;
-  }
-  header{
-    background:#fff;
-    padding:12px 20px;
-    box-shadow:0 2px 8px rgba(0,0,0,.06);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-  }
-  header h1{
-    margin:0;
-    font-size:18px;
-    color:#333;
-  }
-  header .info{
-    font-size:13px;
-    color:var(--muted);
-  }
-  header .actions{
-    display:flex;
-    gap:8px;
-  }
-  .btn{
-    border:none;
-    border-radius:8px;
-    padding:7px 12px;
-    font-size:13px;
-    cursor:pointer;
-    background:var(--prim);
-    color:#fff;
-  }
-  .btn.ghost{
-    background:#eef2f6;
-    color:#333;
-  }
-  .btn.danger{
-    background:#c0392b;
-    color:#fff;
-  }
-  .btn:hover{ filter:brightness(.96); }
-
-  main{
-    max-width:1000px;
-    margin:18px auto 24px;
-    padding:0 16px;
-  }
-  .card{
-    background:#fff;
-    border-radius:10px;
-    box-shadow:0 8px 24px rgba(0,0,0,.06);
-    padding:16px 18px 14px;
-    margin-bottom:18px;
-  }
-  .card h2{
-    margin:0 0 8px;
-    font-size:17px;
-    color:#333;
-  }
-  .card p{
-    margin:0 0 10px;
-    font-size:13px;
-    color:var(--muted);
-  }
-  .row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-  }
-  .field{
-    flex:1 1 180px;
-    min-width:160px;
-    font-size:13px;
-  }
-  .field label{
-    display:block;
-    margin-bottom:3px;
-    color:#444;
-  }
-  .field input,
-  .field select{
-    width:100%;
-    padding:7px 9px;
-    border-radius:6px;
-    border:1px solid #cfd6df;
-    font-size:13px;
-    outline:none;
-  }
-  .field input:focus,
-  .field select:focus{
-    border-color:var(--prim);
-    box-shadow:0 0 0 2px rgba(58,99,133,.16);
-  }
-  .card-footer{
-    margin-top:10px;
-    display:flex;
-    justify-content:flex-end;
-  }
-
-  table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:13px;
-  }
-  th,td{
-    border:1px solid #e1e5ee;
-    padding:6px 6px;
-    text-align:left;
-  }
-  thead th{
-    background:var(--prim);
-    color:#fff;
-  }
-  tbody tr:nth-child(even){
-    background:#f8fafc;
-  }
-  .pill{
-    padding:3px 7px;
-    border-radius:999px;
-    font-size:11px;
-  }
-  .pill.ok{
-    background:#eaf7f0;
-    color:var(--ok);
-    border:1px solid #cdeedd;
-  }
-  .pill.warn{
-    background:#fdecea;
-    color:var(--warn);
-    border:1px solid #f7c6c1;
-  }
-  .small{
-    font-size:11px;
-    color:var(--muted);
-  }
-  .msg{
-    margin-top:8px;
-    font-size:13px;
-    min-height:18px;
-  }
-  .msg.ok{ color:var(--ok); }
-  .msg.err{ color:var(--warn); }
-  @media (max-width:700px){
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin • Diário de Obra</title>
+  <style>
+    :root{
+      --bg:#f4f6fb; --card:#ffffff; --prim:#3A6385; --prim-dark:#284666;
+      --muted:#7b8794; --border:#e2e8f0; --danger:#e53e3e; --ok:#1b8a5a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#102a43}
     header{
-      flex-direction:column;
-      align-items:flex-start;
-      gap:6px;
+      background:#fff;border-bottom:1px solid var(--border);
+      padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;z-index:10
     }
-    header .actions{
-      align-self:stretch;
-      justify-content:flex-start;
-      flex-wrap:wrap;
+    header h1{margin:0;font-size:18px;font-weight:800}
+    header small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+    .user-area{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+    .btn{
+      padding:8px 14px;border-radius:8px;border:none;cursor:pointer;
+      font-size:14px;background:var(--prim);color:#fff
     }
-    table{
-      font-size:12px;
+    .btn:hover{background:var(--prim-dark)}
+    .btn-outline{background:#fff;color:var(--prim);border:1px solid var(--prim)}
+    .btn-outline:hover{background:var(--prim);color:#fff}
+    .btn-danger{background:var(--danger)}
+    .btn-danger:hover{filter:brightness(.95)}
+    .btn-sm{padding:6px 10px;font-size:12px;border-radius:7px}
+
+    main{max-width:1100px;margin:24px auto 40px;padding:0 16px}
+    .card{
+      background:var(--card);border-radius:12px;border:1px solid var(--border);
+      box-shadow:0 8px 24px rgba(15,23,42,.06);padding:16px 18px 18px;margin-bottom:18px
     }
-  }
-</style>
+    h2{margin:0 0 10px;font-size:16px}
+    p{margin:6px 0 14px;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;align-items:end}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    label{font-size:12px;color:var(--muted);margin-bottom:4px;display:block}
+    input,select{
+      width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--border);
+      font-size:14px;outline:none;background:#fff
+    }
+    input:focus,select:focus{border-color:var(--prim);box-shadow:0 0 0 3px rgba(58,99,133,.12)}
+    .row-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    thead th{background:var(--prim);color:#fff;padding:10px 8px;text-align:left}
+    tbody td{border-bottom:1px solid var(--border);padding:8px 8px}
+    tbody tr:nth-child(even){background:#f8fafc}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;
+      border:1px solid var(--border);font-size:12px;background:#f8fafc;color:#233
+    }
+    .ok{color:var(--ok)}
+    .bad{color:var(--danger)}
+    .msg{
+      display:none;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+      font-size:13px;background:#fff
+    }
+    .msg.ok{border-color:#cdeedd;background:#eaf7f0;color:#0f5132}
+    .msg.err{border-color:#fed7d7;background:#fff5f5;color:#8a1f1f}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:12px}
+    .actions-cell{display:flex;gap:6px;flex-wrap:wrap}
+    .w120{width:120px}
+    .w140{width:140px}
+  </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Admin • Gestão de Usuários</h1>
-    <div class="info" id="userInfo">Carregando usuário...</div>
+    <h1>Administração</h1>
+    <small>Gerencie usuários e permissões</small>
   </div>
-  <div class="actions">
-    <button class="btn ghost" id="btnViewer">Ir para Viewer</button>
-    <button class="btn danger" id="btnLogout">Sair</button>
+  <div class="user-area">
+    <span id="userGreeting">Olá, …</span>
+    <a class="btn btn-outline" href="/">Início</a>
+    <button id="btnLogout" class="btn btn-outline">Sair</button>
   </div>
 </header>
 
 <main>
   <section class="card">
     <h2>Novo usuário</h2>
-    <p>Crie um usuário para acessar o sistema. Você pode escolher o perfil: <strong>admin</strong>, <strong>engenheiro</strong> ou <strong>user</strong>.</p>
-    <div class="row">
-      <div class="field">
-        <label for="novoEmail">E-mail (login)</label>
-        <input type="email" id="novoEmail" placeholder="ex: fulano@obra.local">
+    <p>Crie um usuário para acessar o sistema. Perfis: <span class="pill">admin</span> <span class="pill">engenheiro</span> <span class="pill">curadoria</span> <span class="pill">apontador</span></p>
+
+    <div class="grid">
+      <div>
+        <label for="newEmail">E-mail (login)</label>
+        <input id="newEmail" type="email" placeholder="ex: fulano@obra.local" />
       </div>
-      <div class="field">
-        <label for="novoSenha">Senha</label>
-        <input type="text" id="novoSenha" placeholder="Senha inicial">
+      <div>
+        <label for="newPass">Senha</label>
+        <input id="newPass" type="text" placeholder="Senha inicial" />
       </div>
-      <div class="field">
-        <label for="novoPerfil">Perfil</label>
-        <select id="novoPerfil">
-          <option value="user">user</option>
+      <div>
+        <label for="newRole">Perfil</label>
+        <select id="newRole">
+          <option value="apontador">apontador</option>
+          <option value="curadoria">curadoria</option>
           <option value="engenheiro">engenheiro</option>
           <option value="admin">admin</option>
         </select>
       </div>
     </div>
-    <div class="card-footer">
-      <button class="btn" id="btnCriar">Criar usuário</button>
+
+    <div class="row-actions">
+      <button id="btnCreate" class="btn">Criar usuário</button>
     </div>
-    <div id="msgNovo" class="msg"></div>
+
+    <div id="msgCreate" class="msg"></div>
   </section>
 
   <section class="card">
     <h2>Usuários cadastrados</h2>
-    <p>Altere o perfil, ative/desative usuários ou redefina senhas.</p>
-    <div class="small" id="statusLista">Carregando lista...</div>
-    <div style="overflow-x:auto; margin-top:8px;">
+    <p>Acesso restrito a administradores.</p>
+
+    <div id="msgList" class="msg"></div>
+
+    <div style="overflow:auto;">
       <table>
         <thead>
           <tr>
-            <th style="width:26px;">ID</th>
+            <th class="w120">ID</th>
             <th>E-mail</th>
-            <th style="width:110px;">Perfil</th>
-            <th style="width:80px;">Ativo</th>
-            <th style="width:140px;">Criado em</th>
-            <th style="width:170px;">Nova Senha</th>
-            <th style="width:120px;">Ações</th>
+            <th class="w140">Perfil</th>
+            <th class="w120">Ativo</th>
+            <th class="w140">Criado em</th>
+            <th class="w140">Nova Senha</th>
+            <th class="w140">Ações</th>
           </tr>
         </thead>
         <tbody id="tbodyUsers"></tbody>
@@ -240,205 +141,176 @@
 </main>
 
 <script>
-  const API = '';
+  const $ = (id)=>document.getElementById(id);
 
-  const userInfoEl = document.getElementById('userInfo');
-  const statusLista = document.getElementById('statusLista');
-  const tbodyUsers = document.getElementById('tbodyUsers');
-  const msgNovo = document.getElementById('msgNovo');
+  function showMsg(el, type, text){
+    el.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
+    el.textContent = text;
+    el.style.display = 'block';
+  }
+  function clearMsg(el){
+    el.style.display = 'none';
+    el.textContent = '';
+    el.className = 'msg';
+  }
 
-  document.getElementById('btnViewer').addEventListener('click', ()=>{
-    window.location.href = 'viewer.html';
-  });
-  document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  async function ensureAdmin(){
+    const r = await fetch('/api/me', { credentials:'include' });
+    const j = await r.json();
+    const user = j.user || null;
+    if(!user){ location.href='/login.html?next=/admin.html'; return null; }
+    if(user.role !== 'admin'){ alert('Acesso restrito a administradores.'); location.href='/'; return null; }
+    $('userGreeting').textContent = `Olá, ${(user.email||'').split('@')[0] || 'admin'}`;
+    return user;
+  }
+
+  async function logout(){
+    try{ await fetch('/api/logout',{ method:'POST', credentials:'include' }); } finally { location.href='/login.html'; }
+  }
+
+  function roleSelectHtml(selected){
+    const roles = ['apontador','curadoria','engenheiro','admin'];
+    return roles.map(r=>`<option value="${r}" ${r===selected?'selected':''}>${r}</option>`).join('');
+  }
+
+  async function loadUsers(){
+    const tbody = $('tbodyUsers');
+    const msg = $('msgList');
+    clearMsg(msg);
+    tbody.innerHTML = '';
+
     try{
-      await fetch(`${API}/api/logout`, { method:'POST' });
-    }catch(e){}
-    window.location.href = 'login.html';
-  });
+      const r = await fetch('/api/users', { credentials:'include' });
+      const data = await r.json().catch(()=>null);
 
-  async function carregarMe(){
-    try{
-      const resp = await fetch(`${API}/api/me`);
-      if(!resp.ok){
-        userInfoEl.textContent = 'Sessão inválida.';
-        window.location.href = 'login.html';
+      if(!r.ok){
+        showMsg(msg, 'err', (data && data.error) ? data.error : 'Falha ao carregar usuários.');
         return;
       }
-      const data = await resp.json();
-      if(!data.user){
-        userInfoEl.textContent = 'Não autenticado.';
-        window.location.href = 'login.html';
-        return;
-      }
-      userInfoEl.textContent = `${data.user.email} (${data.user.perfil})`;
-    }catch(err){
-      console.error(err);
-      userInfoEl.textContent = 'Erro ao carregar usuário.';
+
+      (data || []).forEach(u=>{
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>${u.id}</td>
+          <td>${u.email}</td>
+          <td>
+            <select data-role="${u.id}">${roleSelectHtml(u.role)}</select>
+          </td>
+          <td>
+            <select data-active="${u.id}">
+              <option value="1" ${u.active ? 'selected':''}>Sim</option>
+              <option value="0" ${!u.active ? 'selected':''}>Não</option>
+            </select>
+          </td>
+          <td class="mono">${u.created_at || ''}</td>
+          <td><input data-pass="${u.id}" type="text" placeholder="(opcional)" /></td>
+          <td class="actions-cell">
+            <button class="btn btn-sm" data-save="${u.id}">Salvar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('button[data-save]').forEach(btn=>{
+        btn.addEventListener('click', ()=>saveUser(btn.getAttribute('data-save')));
+      });
+
+    }catch(e){
+      console.error(e);
+      showMsg(msg, 'err', 'Erro ao carregar usuários.');
     }
   }
 
-  function desenharUsuarios(lista){
-    tbodyUsers.innerHTML = '';
-    if(!lista || !lista.length){
-      statusLista.textContent = 'Nenhum usuário cadastrado.';
-      return;
-    }
-    statusLista.textContent = `Total de usuários: ${lista.length}`;
+  async function createUser(){
+    const email = ($('newEmail').value || '').trim();
+    const senha = ($('newPass').value || '').trim();
+    const role  = $('newRole').value;
 
-    for(const u of lista){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${u.id}</td>
-        <td>${u.email}</td>
-        <td>
-          <select data-role="perfil">
-            <option value="user" ${u.perfil === 'user' ? 'selected' : ''}>user</option>
-            <option value="engenheiro" ${u.perfil === 'engenheiro' ? 'selected' : ''}>engenheiro</option>
-            <option value="admin" ${u.perfil === 'admin' ? 'selected' : ''}>admin</option>
-          </select>
-        </td>
-        <td style="text-align:center;">
-          <select data-role="ativo">
-            <option value="1" ${u.ativo ? 'selected' : ''}>Ativo</option>
-            <option value="0" ${!u.ativo ? 'selected' : ''}>Inativo</option>
-          </select>
-        </td>
-        <td>${u.criado_em || ''}</td>
-        <td>
-          <input type="text" data-role="novaSenha" placeholder="Nova senha" style="width:100%; font-size:12px; padding:5px 6px;">
-        </td>
-        <td>
-          <button class="btn" data-action="salvar" style="margin-bottom:4px; width:100%;">Salvar</button>
-          <button class="btn ghost" data-action="reset" style="width:100%;">Aplicar senha</button>
-        </td>
-      `;
-      tr.dataset.id = u.id;
-      tbodyUsers.appendChild(tr);
-    }
-  }
+    const msg = $('msgCreate');
+    clearMsg(msg);
 
-  async function carregarUsuarios(){
-    statusLista.textContent = 'Carregando lista...';
-    tbodyUsers.innerHTML = '';
-    try{
-      const resp = await fetch(`${API}/api/users`);
-      if(resp.status === 401){
-        alert('Sessão expirada. Faça login novamente.');
-        window.location.href = 'login.html';
-        return;
-      }
-      const data = await resp.json();
-      if(!resp.ok){
-        statusLista.textContent = data.error || 'Erro ao carregar usuários.';
-        return;
-      }
-      desenharUsuarios(data.users || []);
-    }catch(err){
-      console.error(err);
-      statusLista.textContent = 'Erro ao conectar ao servidor.';
-    }
-  }
-
-  document.getElementById('btnCriar').addEventListener('click', async ()=>{
-    msgNovo.textContent = '';
-    msgNovo.className = 'msg';
-
-    const email = document.getElementById('novoEmail').value.trim();
-    const senha = document.getElementById('novoSenha').value.trim();
-    const perfil = document.getElementById('novoPerfil').value;
-
-    if(!email || !senha){
-      msgNovo.textContent = 'Preencha e-mail e senha.';
-      msgNovo.classList.add('err');
+    if(!email || !senha || !role){
+      showMsg(msg, 'err', 'Preencha e-mail, senha e perfil.');
       return;
     }
 
     try{
-      const resp = await fetch(`${API}/api/users`, {
+      const r = await fetch('/api/users', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, senha, perfil })
+        credentials:'include',
+        body: JSON.stringify({ email, senha, role })
       });
-      const data = await resp.json();
-      if(!resp.ok){
-        msgNovo.textContent = data.error || 'Erro ao criar usuário.';
-        msgNovo.classList.add('err');
+      const data = await r.json().catch(()=> ({}));
+
+      if(!r.ok){
+        showMsg(msg, 'err', data.error || 'Não foi possível criar o usuário.');
         return;
       }
-      msgNovo.textContent = 'Usuário criado com sucesso.';
-      msgNovo.classList.add('ok');
-      document.getElementById('novoEmail').value = '';
-      document.getElementById('novoSenha').value = '';
-      document.getElementById('novoPerfil').value = 'user';
-      carregarUsuarios();
-    }catch(err){
-      console.error(err);
-      msgNovo.textContent = 'Erro de conexão.';
-      msgNovo.classList.add('err');
+
+      showMsg(msg, 'ok', 'Usuário criado com sucesso!');
+      $('newEmail').value = '';
+      $('newPass').value = '';
+      $('newRole').value = 'apontador';
+
+      await loadUsers();
+
+    }catch(e){
+      console.error(e);
+      showMsg(msg, 'err', 'Erro de conexão ao criar usuário.');
     }
-  });
+  }
 
-  tbodyUsers.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button');
-    if(!btn) return;
+  async function saveUser(id){
+    const msg = $('msgList');
+    clearMsg(msg);
 
-    const tr = btn.closest('tr');
-    const id = tr.dataset.id;
-    const action = btn.getAttribute('data-action');
+    const roleEl = document.querySelector(`select[data-role="${id}"]`);
+    const actEl  = document.querySelector(`select[data-active="${id}"]`);
+    const passEl = document.querySelector(`input[data-pass="${id}"]`);
 
-    if(action === 'salvar'){
-      const perfilSel = tr.querySelector('select[data-role="perfil"]').value;
-      const ativoSel = tr.querySelector('select[data-role="ativo"]').value === '1';
+    const role = roleEl ? roleEl.value : null;
+    const active = actEl ? (actEl.value === '1') : null;
+    const senha = passEl ? (passEl.value || '').trim() : '';
 
-      try{
-        const resp = await fetch(`${API}/api/users/${id}`, {
-          method:'PATCH',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ perfil: perfilSel, ativo: ativoSel })
-        });
-        const data = await resp.json();
-        if(!resp.ok){
-          alert(data.error || 'Erro ao salvar usuário.');
-          return;
-        }
-        alert('Usuário atualizado com sucesso.');
-        carregarUsuarios();
-      }catch(err){
-        console.error(err);
-        alert('Erro de conexão ao salvar usuário.');
-      }
-    }
+    const payload = {};
+    if(role) payload.role = role;
+    if(active !== null) payload.active = active;
+    if(senha) payload.senha = senha;
 
-    if(action === 'reset'){
-      const novaSenha = tr.querySelector('input[data-role="novaSenha"]').value.trim();
-      if(!novaSenha){
-        alert('Informe a nova senha.');
+    try{
+      const r = await fetch(`/api/users/${id}`, {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json().catch(()=> ({}));
+
+      if(!r.ok){
+        showMsg(msg, 'err', data.error || 'Falha ao atualizar usuário.');
         return;
       }
-      try{
-        const resp = await fetch(`${API}/api/users/${id}/reset-password`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ novaSenha })
-        });
-        const data = await resp.json();
-        if(!resp.ok){
-          alert(data.error || 'Erro ao redefinir senha.');
-          return;
-        }
-        alert('Senha atualizada com sucesso.');
-        tr.querySelector('input[data-role="novaSenha"]').value = '';
-      }catch(err){
-        console.error(err);
-        alert('Erro de conexão ao redefinir senha.');
-      }
+
+      showMsg(msg, 'ok', 'Usuário atualizado.');
+      if(passEl) passEl.value = '';
+      await loadUsers();
+
+    }catch(e){
+      console.error(e);
+      showMsg(msg, 'err', 'Erro de conexão ao atualizar usuário.');
     }
-  });
+  }
 
   window.addEventListener('DOMContentLoaded', async ()=>{
-    await carregarMe();
-    await carregarUsuarios();
+    const ok = await ensureAdmin();
+    if(!ok) return;
+
+    $('btnLogout').addEventListener('click', logout);
+    $('btnCreate').addEventListener('click', createUser);
+
+    await loadUsers();
   });
 </script>
 </body>
