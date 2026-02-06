@@ -29,6 +29,9 @@
     .btn-danger{background:var(--danger)}
     .btn-danger:hover{filter:brightness(.95)}
     .btn-sm{padding:6px 10px;font-size:12px;border-radius:7px}
+    .btn-ghost{background:#eef2f6;color:#233}
+    .btn-ghost:hover{filter:brightness(.98)}
+    .btn-disabled{opacity:.55;pointer-events:none}
 
     main{max-width:1100px;margin:24px auto 40px;padding:0 16px}
     .card{
@@ -46,18 +49,18 @@
       font-size:14px;outline:none;background:#fff
     }
     input:focus,select:focus{border-color:var(--prim);box-shadow:0 0 0 3px rgba(58,99,133,.12)}
+    input[disabled], select[disabled]{background:#f8fafc;color:#66758a}
     .row-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 
     table{width:100%;border-collapse:collapse;font-size:14px}
     thead th{background:var(--prim);color:#fff;padding:10px 8px;text-align:left}
-    tbody td{border-bottom:1px solid var(--border);padding:8px 8px}
+    tbody td{border-bottom:1px solid var(--border);padding:8px 8px;vertical-align:middle}
     tbody tr:nth-child(even){background:#f8fafc}
+
     .pill{
       display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;
       border:1px solid var(--border);font-size:12px;background:#f8fafc;color:#233
     }
-    .ok{color:var(--ok)}
-    .bad{color:var(--danger)}
     .msg{
       display:none;margin-top:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
       font-size:13px;background:#fff
@@ -66,6 +69,7 @@
     .msg.err{border-color:#fed7d7;background:#fff5f5;color:#8a1f1f}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:12px}
     .actions-cell{display:flex;gap:6px;flex-wrap:wrap}
+    .w80{width:80px}
     .w120{width:120px}
     .w140{width:140px}
   </style>
@@ -86,7 +90,7 @@
 <main>
   <section class="card">
     <h2>Novo usuário</h2>
-    <p>Crie um usuário para acessar o sistema. Perfis: <span class="pill">admin</span> <span class="pill">engenheiro</span> <span class="pill">curadoria</span> <span class="pill">apontador</span></p>
+    <p>Perfis: <span class="pill">admin</span> <span class="pill">engenheiro</span> <span class="pill">curadoria</span> <span class="pill">apontador</span></p>
 
     <div class="grid">
       <div>
@@ -125,7 +129,7 @@
       <table>
         <thead>
           <tr>
-            <th class="w120">ID</th>
+            <th class="w80">ID</th>
             <th>E-mail</th>
             <th class="w140">Perfil</th>
             <th class="w120">Ativo</th>
@@ -142,6 +146,8 @@
 
 <script>
   const $ = (id)=>document.getElementById(id);
+
+  let CURRENT_USER = null;
 
   function showMsg(el, type, text){
     el.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
@@ -160,17 +166,51 @@
     const user = j.user || null;
     if(!user){ location.href='/login.html?next=/admin.html'; return null; }
     if(user.role !== 'admin'){ alert('Acesso restrito a administradores.'); location.href='/'; return null; }
+    CURRENT_USER = user;
     $('userGreeting').textContent = `Olá, ${(user.email||'').split('@')[0] || 'admin'}`;
     return user;
   }
 
   async function logout(){
-    try{ await fetch('/api/logout',{ method:'POST', credentials:'include' }); } finally { location.href='/login.html'; }
+    try{ await fetch('/api/logout',{ method:'POST', credentials:'include' }); }
+    finally{ location.href='/login.html'; }
   }
 
   function roleSelectHtml(selected){
     const roles = ['apontador','curadoria','engenheiro','admin'];
     return roles.map(r=>`<option value="${r}" ${r===selected?'selected':''}>${r}</option>`).join('');
+  }
+
+  function setRowEditing(tr, editing){
+    tr.dataset.editing = editing ? '1' : '0';
+    const roleEl = tr.querySelector('select[data-role]');
+    const actEl  = tr.querySelector('select[data-active]');
+    const passEl = tr.querySelector('input[data-pass]');
+
+    roleEl.disabled = !editing;
+    actEl.disabled  = !editing;
+    passEl.disabled = !editing;
+
+    const btnEdit = tr.querySelector('button[data-edit]');
+    const btnSave = tr.querySelector('button[data-save]');
+    const btnCancel = tr.querySelector('button[data-cancel]');
+
+    btnEdit.style.display = editing ? 'none' : 'inline-block';
+    btnSave.style.display = editing ? 'inline-block' : 'none';
+    btnCancel.style.display = editing ? 'inline-block' : 'none';
+  }
+
+  function snapshotRow(tr){
+    tr.dataset.snapRole = tr.querySelector('select[data-role]').value;
+    tr.dataset.snapActive = tr.querySelector('select[data-active]').value;
+    tr.dataset.snapPass = '';
+    tr.querySelector('input[data-pass]').value = '';
+  }
+
+  function restoreRow(tr){
+    tr.querySelector('select[data-role]').value = tr.dataset.snapRole || 'apontador';
+    tr.querySelector('select[data-active]').value = tr.dataset.snapActive || '1';
+    tr.querySelector('input[data-pass]').value = '';
   }
 
   async function loadUsers(){
@@ -194,26 +234,53 @@
         tr.innerHTML = `
           <td>${u.id}</td>
           <td>${u.email}</td>
+          <td><select data-role="${u.id}" disabled>${roleSelectHtml(u.role)}</select></td>
           <td>
-            <select data-role="${u.id}">${roleSelectHtml(u.role)}</select>
-          </td>
-          <td>
-            <select data-active="${u.id}">
+            <select data-active="${u.id}" disabled>
               <option value="1" ${u.active ? 'selected':''}>Sim</option>
               <option value="0" ${!u.active ? 'selected':''}>Não</option>
             </select>
           </td>
           <td class="mono">${u.created_at || ''}</td>
-          <td><input data-pass="${u.id}" type="text" placeholder="(opcional)" /></td>
+          <td><input data-pass="${u.id}" type="text" placeholder="(opcional)" disabled /></td>
           <td class="actions-cell">
-            <button class="btn btn-sm" data-save="${u.id}">Salvar</button>
+            <button class="btn btn-sm btn-ghost" data-edit="${u.id}">Editar</button>
+            <button class="btn btn-sm" data-save="${u.id}" style="display:none;">Salvar</button>
+            <button class="btn btn-sm btn-ghost" data-cancel="${u.id}" style="display:none;">Cancelar</button>
+            <button class="btn btn-sm btn-danger" data-del="${u.id}">Excluir</button>
           </td>
         `;
-        tbody.appendChild(tr);
-      });
 
-      tbody.querySelectorAll('button[data-save]').forEach(btn=>{
-        btn.addEventListener('click', ()=>saveUser(btn.getAttribute('data-save')));
+        // bloqueia exclusão do próprio admin na UI (server também bloqueia)
+        if (CURRENT_USER && Number(u.id) === Number(CURRENT_USER.id)) {
+          const delBtn = tr.querySelector('button[data-del]');
+          delBtn.classList.add('btn-disabled');
+          delBtn.title = 'Você não pode excluir seu próprio usuário.';
+        }
+
+        tbody.appendChild(tr);
+
+        // estado inicial
+        setRowEditing(tr, false);
+
+        // handlers
+        tr.querySelector('button[data-edit]').addEventListener('click', ()=>{
+          snapshotRow(tr);
+          setRowEditing(tr, true);
+        });
+
+        tr.querySelector('button[data-cancel]').addEventListener('click', ()=>{
+          restoreRow(tr);
+          setRowEditing(tr, false);
+        });
+
+        tr.querySelector('button[data-save]').addEventListener('click', ()=>{
+          saveUser(u.id, tr);
+        });
+
+        tr.querySelector('button[data-del]').addEventListener('click', ()=>{
+          deleteUser(u.id, u.email);
+        });
       });
 
     }catch(e){
@@ -262,13 +329,13 @@
     }
   }
 
-  async function saveUser(id){
+  async function saveUser(id, tr){
     const msg = $('msgList');
     clearMsg(msg);
 
-    const roleEl = document.querySelector(`select[data-role="${id}"]`);
-    const actEl  = document.querySelector(`select[data-active="${id}"]`);
-    const passEl = document.querySelector(`input[data-pass="${id}"]`);
+    const roleEl = tr.querySelector(`select[data-role="${id}"]`);
+    const actEl  = tr.querySelector(`select[data-active="${id}"]`);
+    const passEl = tr.querySelector(`input[data-pass="${id}"]`);
 
     const role = roleEl ? roleEl.value : null;
     const active = actEl ? (actEl.value === '1') : null;
@@ -294,12 +361,45 @@
       }
 
       showMsg(msg, 'ok', 'Usuário atualizado.');
-      if(passEl) passEl.value = '';
+      setRowEditing(tr, false);
       await loadUsers();
 
     }catch(e){
       console.error(e);
       showMsg(msg, 'err', 'Erro de conexão ao atualizar usuário.');
+    }
+  }
+
+  async function deleteUser(id, email){
+    const msg = $('msgList');
+    clearMsg(msg);
+
+    if (CURRENT_USER && Number(id) === Number(CURRENT_USER.id)) {
+      showMsg(msg, 'err', 'Você não pode excluir seu próprio usuário.');
+      return;
+    }
+
+    const ok = confirm(`Excluir o usuário:\n\n${email}\n\nEssa ação não pode ser desfeita.`);
+    if(!ok) return;
+
+    try{
+      const r = await fetch(`/api/users/${id}`, {
+        method:'DELETE',
+        credentials:'include'
+      });
+      const data = await r.json().catch(()=> ({}));
+
+      if(!r.ok){
+        showMsg(msg, 'err', data.error || 'Falha ao excluir usuário.');
+        return;
+      }
+
+      showMsg(msg, 'ok', 'Usuário excluído.');
+      await loadUsers();
+
+    }catch(e){
+      console.error(e);
+      showMsg(msg, 'err', 'Erro de conexão ao excluir usuário.');
     }
   }
 
