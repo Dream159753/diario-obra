@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS intercorrencias (
   FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
 );
 
+-- ✅ NOVO: ausentes individualizados (chapa/nome/função)
 CREATE TABLE IF NOT EXISTS ausentes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   diario_id INTEGER NOT NULL,
@@ -88,7 +89,7 @@ CREATE TABLE IF NOT EXISTS ausentes (
 );
 `);
 
-// (Opcional) Índices para desempenho
+// Índices para desempenho
 db.exec(`
 CREATE INDEX IF NOT EXISTS idx_diarios_data         ON diarios(data);
 CREATE INDEX IF NOT EXISTS idx_funcoes_diario       ON funcoes(diario_id);
@@ -110,15 +111,14 @@ function ensureUser(email, pass, role) {
 }
 ensureUser('admin@obra.local', 'admin123', 'admin');
 ensureUser('engenheiro@obra.local', '123456', 'engenheiro');
-// exemplo (se quiser seed):
-// ensureUser('apontador@obra.local', '123456', 'apontador');
-// ensureUser('curadoria@obra.local', '123456', 'curadoria');
 
 // --------------------------------------------------
 // Carregamento do CSV de funcionários em memória
 // --------------------------------------------------
 /**
  * Espera CSV com cabeçalho: chapa;nome;funcao (ou vírgula)
+ * Exemplo:
+ *   20019;JOSE HADONIAS ALVES PINHEIRO;CARPINTEIRO
  */
 const funcionarios = [];
 (function loadFuncionarios() {
@@ -180,7 +180,6 @@ const CAN_LAUNCH = ['admin', 'engenheiro', 'curadoria', 'apontador']; // pode la
 
 // --------------------------------------------------
 // 🔒 Bloqueio de HTML sensível via express.static
-// (IMPORTANTE: impede apontador de abrir /viewer.html etc. direto)
 // --------------------------------------------------
 const PROTECTED_HTML = new Set([
   '/viewer.html',
@@ -193,14 +192,14 @@ app.use((req, res, next) => {
   const p = req.path;
   if (!PROTECTED_HTML.has(p)) return next();
 
-  // não logado -> manda pro login (HTML)
+  // não logado -> manda pro login
   if (!req.session.user) {
     return res.redirect(`/login.html?next=${encodeURIComponent(p)}`);
   }
 
   // apontador não acessa essas páginas
   if (!CAN_CURATE.includes(req.session.user.role)) {
-    return res.redirect('/'); // manda pro hub
+    return res.redirect('/');
   }
 
   next();
@@ -282,7 +281,6 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'Você não pode excluir seu próprio usuário.' });
     }
 
-    // não deixar excluir o último admin ativo
     const admins = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1").get();
     const target = db.prepare("SELECT id, role, active FROM users WHERE id=?").get(id);
     if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -320,7 +318,7 @@ app.get('/api/funcionarios', requireLogin, (req, res) => {
 // Diários – criação e leitura
 // --------------------------------------------------
 
-// ✅ Apontador pode salvar diário
+// ✅ Apontador pode salvar diário (incluindo ausentes individualizados)
 app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
   try {
     const {
@@ -328,9 +326,9 @@ app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
       obra,
       responsavel,
       observacoes,
-      funcoes = [],          // [{funcao, presente/ausente/ferias} ou presentes/ausentes/ferias]
-      intercorrencias = [],  // [{codigo, descricao}]
-      ausentes = [],         // [{chapa,nome,funcao}]
+      funcoes = [],
+      intercorrencias = [],
+      ausentes = [], // ✅ vem do form
     } = req.body || {};
 
     if (!data || !obra || !responsavel) {
@@ -343,6 +341,7 @@ app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
     const info = insD.run(data, obra, responsavel, observacoes || null);
     const diarioId = info.lastInsertRowid;
 
+    // Funções (aceita presente/ausente/ferias ou presentes/ausentes/ferias)
     const insF = db.prepare(
       `INSERT INTO funcoes(diario_id,funcao,presentes,ausentes,ferias) VALUES (?,?,?,?,?)`
     );
@@ -356,6 +355,7 @@ app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
       );
     }
 
+    // Intercorrências
     const insI = db.prepare(
       `INSERT INTO intercorrencias(diario_id,codigo,descricao) VALUES (?,?,?)`
     );
@@ -364,6 +364,7 @@ app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
       insI.run(diarioId, String(i.codigo).trim(), (i.descricao || '').trim());
     }
 
+    // ✅ AUSENTES individualizados (chapa/nome/função)
     const insA = db.prepare(
       `INSERT INTO ausentes(diario_id,chapa,nome,funcao) VALUES (?,?,?,?)`
     );
@@ -371,8 +372,8 @@ app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
       if (!a) continue;
       const chapa = (a.chapa || '').trim();
       const nome  = (a.nome  || '').trim();
-      const func  = (a.funcao|| '').trim();
-      if (!chapa && !nome && !func) continue;
+      const func  = (a.funcao || '').trim();
+      if (!chapa && !nome && !func) continue; // evita linha vazia
       insA.run(diarioId, chapa || null, nome || null, func || null);
     }
 
@@ -471,7 +472,7 @@ app.get('/api/diarios', requireRole(CAN_CURATE), (req, res) => {
   }
 });
 
-// ✅ Somente curadoria/engenheiro/admin pode ver detalhe
+// ✅ Somente curadoria/engenheiro/admin pode ver detalhe (inclui ausentes)
 app.get('/api/diarios/:id', requireRole(CAN_CURATE), (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -486,8 +487,9 @@ app.get('/api/diarios/:id', requireRole(CAN_CURATE), (req, res) => {
       'SELECT codigo,descricao FROM intercorrencias WHERE diario_id = ? ORDER BY id'
     ).all(id);
 
+    // ✅ AUSENTES individualizados
     const aus = db.prepare(
-      'SELECT chapa,nome,funcao FROM ausentes WHERE diario_id = ? ORDER BY id'
+      'SELECT chapa,nome,funcao FROM ausentes WHERE diario_id = ? ORDER BY nome'
     ).all(id);
 
     res.json({ ...d, funcoes: fun, intercorrencias: inc, ausentes: aus });
@@ -498,7 +500,7 @@ app.get('/api/diarios/:id', requireRole(CAN_CURATE), (req, res) => {
 });
 
 // -----------------------------------------------
-// Rotas HTML protegidas (roteamento simples)
+// Rotas HTML (roteamento simples)
 // -----------------------------------------------
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
