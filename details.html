@@ -82,12 +82,12 @@
     </div>
 
     <div class="wrap grid" style="margin-top:16px;">
-      <!-- Ausentes Identificados (a API atual não fornece) -->
+      <!-- Ausentes Identificados -->
       <div class="card">
         <h2>Ausentes Identificados</h2>
         <table id="tabAus">
           <thead><tr><th style="width:20%">Chapa</th><th>Nome</th><th style="width:35%">Função</th></tr></thead>
-          <tbody><tr><td colspan="3" class="muted">Não disponível nesta versão (API não armazena ausentes individualizados).</td></tr></tbody>
+          <tbody><tr><td colspan="3" class="muted">Nenhum ausente informado.</td></tr></tbody>
         </table>
       </div>
 
@@ -105,84 +105,56 @@
 
 <script>
 const API = location.origin;
-
 function getId(){ return new URL(location.href).searchParams.get('id'); }
 function text(x){ return (x==null||String(x).trim()==='')?'—':x; }
-
-function formatIsoToBR(iso){
-  if(!iso) return '';
-  // iso esperado: YYYY-MM-DD
-  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){
-    const [yy,mm,dd] = iso.split('-');
-    return `${dd}/${mm}/${yy}`;
-  }
-  const d = new Date(iso);
-  if(Number.isNaN(d.getTime())) return '';
-  const dd=String(d.getDate()).padStart(2,'0');
-  const mm=String(d.getMonth()+1).padStart(2,'0');
-  const yy=d.getFullYear();
-  return `${dd}/${mm}/${yy}`;
-}
-
-function sumFuncoes(funcoes, key){
-  return (funcoes||[]).reduce((s,f)=> s + (parseInt(f[key]||0,10)||0), 0);
-}
+function toInt(v){ const n=parseInt(v,10); return Number.isFinite(n)?n:0; }
 
 async function ensureAuth() {
   const r = await fetch(`${API}/api/me`, { credentials: 'include' });
-  if(!r.ok){ location.href = '/login.html'; return false; }
-  const j = await r.json();
-  if(!j || !j.user){ location.href = '/login.html'; return false; }
+  if (!r.ok) { location.href = '/login.html'; return false; }
+  const {user} = await r.json();
+  if (!user) { location.href = '/login.html'; return false; }
   return true;
 }
 
 function renderFuncoes(funcoes, hideZero=false){
-  const tb = document.querySelector('#tabFun tbody');
-  tb.innerHTML='';
-
+  const tb = document.querySelector('#tabFun tbody'); tb.innerHTML='';
   (funcoes||[]).forEach(f=>{
-    // API retorna: presentes / ausentes / ferias
-    const p   = parseInt(f.presentes||0,10)||0;
-    const a   = parseInt(f.ausentes ||0,10)||0;
-    const fer = parseInt(f.ferias   ||0,10)||0;
+    const p = toInt(f.presentes);
+    const a = toInt(f.ausentes);
+    const fer = toInt(f.ferias);
     const tot = p+a+fer;
-
     if(hideZero && tot===0) return;
-
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${text(f.funcao)}</td><td>${p}</td><td>${a}</td><td>${fer}</td><td><strong>${tot}</strong></td>`;
     tb.appendChild(tr);
   });
-
-  if(!tb.children.length){
-    tb.innerHTML = `<tr><td colspan="5" class="muted">Nenhuma função lançada.</td></tr>`;
-  }
 }
 
+function sum(arr,key){ return (arr||[]).reduce((s,o)=>s+toInt(o?.[key]),0); }
+
 async function load(){
-  const ok = await ensureAuth();
-  if(!ok) return;
+  const ok = await ensureAuth(); if(!ok) return;
 
   const id = getId();
   if(!id){ alert('ID ausente.'); return; }
 
-  const r = await fetch(`${API}/api/diarios/${encodeURIComponent(id)}`, { credentials:'include' });
+  const r = await fetch(`${API}/api/diarios/${id}`, { credentials:'include' });
   const d = await r.json();
   if(!r.ok){ alert(d.error||'Erro ao carregar'); return; }
 
   document.getElementById('titulo').textContent = `Diário #${d.id}`;
-  document.getElementById('subinfo').textContent = `Detalhes do lançamento`;
+  document.getElementById('subinfo').textContent = d.created_at ? `Criado em ${d.created_at}` : '';
   document.getElementById('obra').textContent = text(d.obra);
   document.getElementById('resp').textContent = text(d.responsavel);
-  document.getElementById('data').textContent = text(formatIsoToBR(d.data));
+  document.getElementById('data').textContent = text(d.data);
   document.getElementById('obs').textContent = text(d.observacoes);
   document.getElementById('btnEdit').href = `edit.html?id=${encodeURIComponent(d.id)}`;
 
-  // KPIs (API: funcoes[].presentes/ausentes/ferias)
-  const pres = sumFuncoes(d.funcoes,'presentes');
-  const aus  = sumFuncoes(d.funcoes,'ausentes');
-  const fer  = sumFuncoes(d.funcoes,'ferias');
-
+  // KPIs (✅ chaves corretas: presentes/ausentes/ferias)
+  const pres = sum(d.funcoes,'presentes');
+  const aus  = sum(d.funcoes,'ausentes');
+  const fer  = sum(d.funcoes,'ferias');
   document.getElementById('kpiPres').textContent = pres;
   document.getElementById('kpiAus').textContent  = aus;
   document.getElementById('kpiFer').textContent  = fer;
@@ -195,22 +167,32 @@ async function load(){
   chk.addEventListener('change', rerender);
   rerender();
 
-  // Intercorrências (API retorna intercorrencias no detalhe)
+  // ✅ Ausentes Identificados (usa d.ausentes do backend)
+  const tbA = document.querySelector('#tabAus tbody');
+  tbA.innerHTML = '';
+
+  const listAus = Array.isArray(d.ausentes) ? d.ausentes : [];
+  if(listAus.length){
+    listAus.forEach(a=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${text(a.chapa)}</td><td>${text(a.nome)}</td><td>${text(a.funcao)}</td>`;
+      tbA.appendChild(tr);
+    });
+  } else {
+    tbA.innerHTML = `<tr><td colspan="3" class="muted">Nenhum ausente informado.</td></tr>`;
+  }
+
+  // Intercorrências
   const box = document.getElementById('interList');
   if((d.intercorrencias||[]).length){
-    const ul=document.createElement('ul');
-    ul.style.margin='0';
-    ul.style.paddingLeft='18px';
-
+    const ul=document.createElement('ul'); ul.style.margin='0'; ul.style.paddingLeft='18px';
     d.intercorrencias.forEach(i=>{
-      const code=(i.codigo!=null && String(i.codigo).trim()!=='') ? `#${String(i.codigo).trim()} — ` : '';
+      const code=(i.codigo!=null && String(i.codigo).trim()!=='')?`#${i.codigo} — `:'';
       const li=document.createElement('li');
-      li.textContent = code + (i.descricao || '—');
+      li.textContent = code + (i.descricao||'—');
       ul.appendChild(li);
     });
-
-    box.innerHTML='';
-    box.appendChild(ul);
+    box.innerHTML=''; box.appendChild(ul);
   } else {
     box.textContent='Nenhuma intercorrência registrada.';
   }
