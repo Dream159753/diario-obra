@@ -5,12 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Diário de Obra</title>
 <style>
-  :root { --prim:#3A6385; --muted:#66758a; --ok:#1b8a5a; --warn:#c0392b; }
+  :root {
+    --prim:#3A6385; --prim-dark:#284666; --muted:#66758a; --ok:#1b8a5a; --warn:#c0392b;
+    --bg:#f4f6f9; --card:#fff; --border:#e2e8f0;
+  }
   *{ box-sizing:border-box; }
-  body{ font-family: Arial, sans-serif; background:#f4f6f9; padding:24px; color:#233; }
+  body{ font-family: Arial, sans-serif; background:var(--bg); margin:0; color:#233; }
+
+  /* ✅ Cabeçalho padrão */
+  header{
+    background:#fff;border-bottom:1px solid var(--border);
+    padding:16px 24px;display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:10
+  }
+  header h1{margin:0;font-size:18px;font-weight:700;color:#102a43}
+  header small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .user-area{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}
+  .btn{
+    padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px;
+    cursor:pointer; font-size:15px;
+  }
+  .btn:hover{ background:var(--prim-dark); }
+  .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
+  .btn-ghost{ background:#eef2f6; color:#233; }
+  .btn-ghost:hover{ background:#e6eef7; }
+  .del{ background:#e74c3c; }
+  .del:hover{ filter:brightness(.95); }
+
+  main{ max-width:1100px; margin:18px auto 40px; padding:0 16px; }
+
   h2{ text-align:center; color:#333; margin:0 0 16px; }
+
   .section{
-    background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08);
+    background:var(--card); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.08);
     overflow:hidden; margin-bottom:18px;
   }
   .section h3{
@@ -20,8 +47,10 @@
   .bar{
     display:flex; gap:12px; align-items:center; justify-content:space-between;
     padding:12px 16px; background:#f9fbfd; border-bottom:1px solid #eef2f6;
+    flex-wrap:wrap;
   }
   .meta{ font-size:13px; color:var(--muted); }
+
   table{ width:100%; border-collapse:collapse; }
   thead th{ background:var(--prim); color:#fff; position:sticky; top:0; z-index:1; }
   th,td{ border:1px solid #e6e6e6; padding:10px 8px; text-align:center; font-size:14px; }
@@ -39,136 +68,197 @@
   input[type="text"][data-kind="codigo"]{ text-align:center; }
   textarea{ resize:vertical; min-height:42px; text-align:left; }
   input:focus, select:focus, textarea:focus{ border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12); }
+
   .total-funcao, #totalGeral{ font-weight:700; color:var(--prim); }
   tfoot th{ background:#f5f9ff; font-size:15px; }
-  .btn{ padding:10px 18px; background:var(--prim); color:#fff; border:0; border-radius:8px; cursor:pointer; font-size:15px; }
-  .btn:hover{ filter:brightness(.95); }
-  .btn-sm{ padding:8px 12px; font-size:13px; border-radius:7px; }
-  .btn-ghost{ background:#eef2f6; color:#333; }
-  .del{ background:#e74c3c; color:#fff; }
-  .del:hover{ filter:brightness(.95); }
+
   .foot-actions{ padding:16px; text-align:center; }
+
   .pill{ font-size:12px; padding:6px 10px; border-radius:999px; background:#eef2f6; color:#333; }
   .pill.ok{ background:#eaf7f0; color:var(--ok); border:1px solid #cdeedd; }
   .pill.warn{ background:#fdecea; color:var(--warn); border:1px solid #f7c6c1; }
+
   .catalog{ display:none; padding:0 16px 16px; }
   .catalog table th, .catalog table td{ font-size:13px; text-align:left; }
+
+  .errorBox{
+    display:none;
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:8px;
+    background:#fdecea;
+    border:1px solid #f7c6c1;
+    color:#9b2c2c;
+    font-size:13px;
+    white-space:pre-line;
+  }
 </style>
 </head>
 <body>
-<h2>📒 Diário de Obra</h2>
 
-<form id="diarioForm" autocomplete="off">
-  <!-- IDENTIFICAÇÃO -->
-  <div class="section" id="sec-identificacao">
-    <h3>Identificação do Diário</h3>
-    <table>
-      <tr><th style="width:30%">Obra</th><td><input type="text" name="obra" placeholder="Nome da obra" required></td></tr>
-      <tr><th>Responsável pelo preenchimento</th><td><input type="text" name="responsavel" placeholder="Seu nome completo" required></td></tr>
-      <tr><th>Data</th><td><input type="date" name="data" required></td></tr>
-    </table>
-    <div class="bar">
-      <div class="meta"><strong>Dica:</strong> preencha a identificação antes de registrar as presenças.</div>
-      <button type="button" class="btn btn-ghost" id="limpar">Zerar Tudo</button>
-    </div>
+<header>
+  <div>
+    <h1>📒 Diário de Obra</h1>
+    <small>Lançamento diário de equipe, ausências e intercorrências</small>
   </div>
-
-  <!-- FUNÇÕES -->
-  <div class="section" id="sec-funcoes">
-    <h3>Equipe por Função (Presente / Ausente / Férias / Total)</h3>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:38%">Função</th>
-          <th style="width:15%">Presente</th>
-          <th style="width:15%">Ausente</th>
-          <th style="width:15%">Férias</th>
-          <th style="width:17%">Total</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO DE PROTEÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">CARPINTEIRO SERRA E CAIXINHA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">ARMADOR ENROLANDO ARAME</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE ELEVAÇÃO ESTRUTURAL</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO MARCAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CHAPISCO + TIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO ALVENARIA VEDAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO MASSA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CONTRA PISO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CHUMBAMENTO PCF</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ GESSO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO CONTRA MARCO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO REGULARIZAÇÃO DE ESCADA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO POÇO DO ELEVADOR E PRESSURIZAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">PEDREIRO DE ARREMATE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">REJUNTADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SERVENTE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SINALEIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">SOLDADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-        <tr><td class="fun">TEC. DE SEGURANÇA DO TRABALHO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
-      </tbody>
-      <tfoot><tr><th colspan="4">TOTAL GERAL</th><th id="totalGeral">0</th></tr></tfoot>
-    </table>
+  <div class="user-area">
+    <span id="userGreeting">Olá, …</span>
+    <button id="btnLogout" class="btn btn-ghost btn-sm">Sair</button>
   </div>
+</header>
 
-  <!-- AUSENTES -->
-  <div class="section" id="sec-ausentes">
-    <h3>Identificação dos Ausentes <span id="badgeResumo" class="pill">Listados: 0 • Informados: 0</span></h3>
-    <table id="tblAusentes">
-      <thead><tr><th style="width:20%">Chapa</th><th style="width:40%">Nome</th><th style="width:30%">Função</th><th style="width:10%"></th></tr></thead>
-      <tbody id="tbodyAusentes"></tbody>
-      <tfoot><tr><td colspan="4" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addAusente">+ Adicionar ausente</button></td></tr></tfoot>
-    </table>
-  </div>
-
-  <!-- INTERCORRÊNCIAS -->
-  <div class="section" id="sec-inter">
-    <h3>Intercorrências (fatores que atrapalharam a produção) <span id="badgeInter" class="pill">Itens: 0 • Duplicados: 0</span></h3>
-    <div class="bar" style="border-top:1px solid #eef2f6;">
-      <div class="meta">Use um <strong>código numérico</strong> e descreva o ocorrido. Ex.: <em>15 — grua quebrada das 07:00 às 16:00</em></div>
-      <div>
-        <button type="button" class="btn btn-sm btn-ghost" id="toggleCatalogo">📖 Ver catálogo de códigos</button>
-        <button type="button" class="btn btn-sm" id="addInter">+ Adicionar intercorrência</button>
-      </div>
-    </div>
-    <div class="catalog" id="catalogo">
+<main>
+  <form id="diarioForm" autocomplete="off">
+    <!-- IDENTIFICAÇÃO -->
+    <div class="section" id="sec-identificacao">
+      <h3>Identificação do Diário</h3>
       <table>
-        <thead><tr><th style="width:12%">Código</th><th>Título</th><th>Modelo de descrição</th></tr></thead>
-        <tbody id="catalogoBody"></tbody>
+        <tr><th style="width:30%">Obra</th><td><input type="text" name="obra" placeholder="Nome da obra" required></td></tr>
+        <tr><th>Responsável pelo preenchimento</th><td><input type="text" name="responsavel" placeholder="Seu nome" required></td></tr>
+        <tr><th>Data</th><td><input type="date" name="data" required></td></tr>
+      </table>
+      <div class="bar">
+        <div class="meta"><strong>Dica:</strong> preencha a identificação antes de registrar as presenças.</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="limpar">Zerar Tudo</button>
+      </div>
+      <div id="errorBox" class="errorBox"></div>
+    </div>
+
+    <!-- FUNÇÕES -->
+    <div class="section" id="sec-funcoes">
+      <h3>Equipe por Função (Presente / Ausente / Férias / Total)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:38%">Função</th>
+            <th style="width:15%">Presente</th>
+            <th style="width:15%">Ausente</th>
+            <th style="width:15%">Férias</th>
+            <th style="width:17%">Total</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <!-- TODAS AS FUNÇÕES -->
+          <tr><td class="fun">ADMINISTRATIVO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">MESTRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">ENCARREGADO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">CARPINTEIRO TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">CARPINTEIRO PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">CARPINTEIRO DE PROTEÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">CARPINTEIRO SERRA E CAIXINHA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">ARMADOR TORRE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">ARMADOR PERIFERIA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">ARMADOR ENROLANDO ARAME</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO DE ELEVAÇÃO ESTRUTURAL</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO MARCAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO CHAPISCO + TIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO ALVENARIA VEDAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO MASSA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO CONTRA PISO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO CHUMBAMENTO PCF</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ GESSO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO P/ CERÂMICA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO CONTRA MARCO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO REGULARIZAÇÃO DE ESCADA</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO DE REGULARIZAÇÃO POÇO DO ELEVADOR E PRESSURIZAÇÃO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">PEDREIRO DE ARREMATE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">REJUNTADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">SERVENTE</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">SINALEIRO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">SOLDADOR</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+          <tr><td class="fun">TEC. DE SEGURANÇA DO TRABALHO</td><td><input type="number" data-tipo="presente" value="0" min="0"></td><td><input type="number" data-tipo="ausente" value="0" min="0"></td><td><input type="number" data-tipo="ferias" value="0" min="0"></td><td class="total-funcao">0</td></tr>
+        </tbody>
+        <tfoot><tr><th colspan="4">TOTAL GERAL</th><th id="totalGeral">0</th></tr></tfoot>
       </table>
     </div>
-    <table id="tblInter">
-      <thead><tr><th style="width:18%">Código</th><th>Descrição</th><th style="width:12%"></th></tr></thead>
-      <tbody id="tbodyInter"></tbody>
-      <tfoot><tr><td colspan="3" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addInter2">+ Adicionar intercorrência</button></td></tr></tfoot>
-    </table>
-    <datalist id="listaCodigos"></datalist>
-  </div>
 
-  <!-- OBSERVAÇÕES -->
-  <div class="section" id="sec-observacoes">
-    <h3>Observações / Serviços em Execução</h3>
-    <div style="padding:16px;">
-      <textarea name="observacoes" placeholder="Descreva aqui os serviços executados hoje..." rows="5" style="width:100%;"></textarea>
+    <!-- AUSENTES -->
+    <div class="section" id="sec-ausentes">
+      <h3>Identificação dos Ausentes <span id="badgeResumo" class="pill">Listados: 0 • Informados: 0</span></h3>
+      <table id="tblAusentes">
+        <thead><tr><th style="width:20%">Chapa</th><th style="width:40%">Nome</th><th style="width:30%">Função</th><th style="width:10%"></th></tr></thead>
+        <tbody id="tbodyAusentes"></tbody>
+        <tfoot><tr><td colspan="4" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addAusente">+ Adicionar ausente</button></td></tr></tfoot>
+      </table>
     </div>
-  </div>
 
-  <!-- BOTÃO FINAL -->
-  <div class="foot-actions"><button type="submit" class="btn">Salvar Diário</button></div>
-</form>
+    <!-- INTERCORRÊNCIAS -->
+    <div class="section" id="sec-inter">
+      <h3>Intercorrências (fatores que atrapalharam a produção) <span id="badgeInter" class="pill">Itens: 0 • Duplicados: 0</span></h3>
+      <div class="bar" style="border-top:1px solid #eef2f6;">
+        <div class="meta">Use um <strong>código numérico</strong> e descreva o ocorrido. Ex.: <em>15 — grua quebrada das 07:00 às 16:00</em></div>
+        <div>
+          <button type="button" class="btn btn-sm btn-ghost" id="toggleCatalogo">📖 Ver catálogo de códigos</button>
+          <button type="button" class="btn btn-sm" id="addInter">+ Adicionar intercorrência</button>
+        </div>
+      </div>
+      <div class="catalog" id="catalogo">
+        <table>
+          <thead><tr><th style="width:12%">Código</th><th>Título</th><th>Modelo de descrição</th></tr></thead>
+          <tbody id="catalogoBody"></tbody>
+        </table>
+      </div>
+      <table id="tblInter">
+        <thead><tr><th style="width:18%">Código</th><th>Descrição</th><th style="width:12%"></th></tr></thead>
+        <tbody id="tbodyInter"></tbody>
+        <tfoot><tr><td colspan="3" style="text-align:left; padding:12px;"><button type="button" class="btn btn-sm" id="addInter2">+ Adicionar intercorrência</button></td></tr></tfoot>
+      </table>
+      <datalist id="listaCodigos"></datalist>
+    </div>
+
+    <!-- OBSERVAÇÕES -->
+    <div class="section" id="sec-observacoes">
+      <h3>Observações / Serviços em Execução</h3>
+      <div style="padding:16px;">
+        <textarea name="observacoes" placeholder="Descreva aqui os serviços executados hoje..." rows="5" style="width:100%;"></textarea>
+      </div>
+    </div>
+
+    <!-- BOTÃO FINAL -->
+    <div class="foot-actions"><button type="submit" class="btn">Salvar Diário</button></div>
+  </form>
+</main>
 
 <script>
 /* ====== CONFIG API ====== */
 const API = '';
+
+/* ✅ Header: auth + preencher responsável + logout */
+async function carregarUsuarioEPreencherResponsavel(){
+  try{
+    const r = await fetch(`${API}/api/me`, { credentials:'include' });
+    if(!r.ok){
+      location.href='login.html';
+      return;
+    }
+    const { user } = await r.json();
+    if(!user){
+      location.href='login.html';
+      return;
+    }
+
+    const email = user.email || '';
+    const nomeCurto = (email.split('@')[0] || 'usuário');
+    document.getElementById('userGreeting').textContent = `Olá, ${nomeCurto}`;
+
+    // ✅ preenche o responsável automaticamente (editável)
+    const inpResp = document.querySelector('[name="responsavel"]');
+    if(inpResp && (!inpResp.value || inpResp.value.trim()==='')){
+      inpResp.value = nomeCurto;
+    }
+  } catch(e){
+    location.href='login.html';
+  }
+}
+
+async function logout(){
+  try{
+    await fetch(`${API}/api/logout`, { method:'POST', credentials:'include' });
+  } finally {
+    location.href='login.html';
+  }
+}
+document.getElementById('btnLogout').addEventListener('click', logout);
 
 /* Catálogo (inclui código 0) */
 const CATALOG = [
@@ -226,18 +316,6 @@ function aplicarFuncaoSimplificada(selectFunc, funcaoRaw){
   if(match) selectFunc.value = match.value;
 }
 
-async function buscarFuncionarioPorChapa(chapa){
-  const term = String(chapa||'').trim();
-  if(!term) return null;
-  const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(term)}`, { credentials:'include' });
-  if(!r.ok) return null;
-  const lista = await r.json();
-  if(!Array.isArray(lista) || !lista.length) return null;
-  // tenta match exato de chapa; se não, pega o primeiro
-  const exato = lista.find(x => String(x.chapa||'').trim() === term);
-  return exato || lista[0];
-}
-
 function wireChapaAutocomplete(tr){
   const inputChapa = tr.querySelector('[name="aus_chapa"]');
   const inputNome  = tr.querySelector('[name="aus_nome"]');
@@ -248,10 +326,20 @@ function wireChapaAutocomplete(tr){
     const chapa = inputChapa.value.trim();
     if(!chapa) return;
     try{
-      const f = await buscarFuncionarioPorChapa(chapa);
-      if(f){
-        if(f.nome) inputNome.value = f.nome;
-        if(f.funcao) aplicarFuncaoSimplificada(selectFunc, f.funcao);
+      // ✅ busca por prefixo/consulta (já existe)
+      const r = await fetch(`${API}/api/funcionarios?q=${encodeURIComponent(chapa)}`, { credentials:'include' });
+      if(r.ok){
+        const lista = await r.json();
+        const f = Array.isArray(lista) ? lista.find(x => String(x.chapa).trim() === chapa) : null;
+
+        if(f){
+          inputNome.value = f.nome || inputNome.value;
+          if(f.funcao) aplicarFuncaoSimplificada(selectFunc, f.funcao);
+        } else {
+          // fallback: se tiver label no datalist
+          const optDl = Array.from(dl.options).find(o=>o.value===chapa);
+          if(optDl && optDl.label) inputNome.value = optDl.label;
+        }
       }
     }catch(err){
       console.error(err);
@@ -293,7 +381,20 @@ function novaLinhaAusente(){
   return tr;
 }
 
-function contarAusentesListados(){
+function contarAusentesListadosValidos(){
+  // ✅ conta só linhas realmente preenchidas (chapa+nome+funcao)
+  let n=0;
+  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+    const c=tr.querySelector('[name="aus_chapa"]').value.trim();
+    const nm=tr.querySelector('[name="aus_nome"]').value.trim();
+    const fu=tr.querySelector('[name="aus_funcao"]').value;
+    if(c && nm && fu) n++;
+  });
+  return n;
+}
+
+function contarAusentesListadosQualquer(){
+  // só pra badge (qualquer coisa preenchida)
   let n=0;
   document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     const c=tr.querySelector('[name="aus_chapa"]').value.trim();
@@ -303,8 +404,9 @@ function contarAusentesListados(){
   });
   return n;
 }
+
 function atualizarBadgeAusentes(){
-  const list=contarAusentesListados(), inf=totalAusentesInformados();
+  const list=contarAusentesListadosQualquer(), inf=totalAusentesInformados();
   const b=document.getElementById('badgeResumo');
   b.textContent=`Listados: ${list} • Informados: ${inf}`;
   b.className='pill '+(list===inf?'ok':'warn');
@@ -355,7 +457,9 @@ function autoDescricaoPorCodigo(inputCodigo){
 /* ======= EVENTOS ======= */
 document.getElementById('tbody').addEventListener('input', e=>{
   if(e.target.matches('input[type="number"]')){
-    atualizarLinha(e.target.closest('tr')); renderTotalGeral(); atualizarBadgeAusentes();
+    atualizarLinha(e.target.closest('tr'));
+    renderTotalGeral();
+    atualizarBadgeAusentes();
   }
 });
 
@@ -363,32 +467,47 @@ document.getElementById('limpar').addEventListener('click', ()=>{
   document.querySelectorAll('#diarioForm input[type="number"]').forEach(i=>i.value=0);
   document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
   renderTotalGeral();
+
   document.querySelector('[name="obra"]').value='';
-  document.querySelector('[name="responsavel"]').value='';
+  // NÃO limpamos o responsável automático (fica preenchido)
   document.querySelector('[name="data"]').value='';
   document.querySelector('[name="observacoes"]').value='';
+
   document.getElementById('tbodyAusentes').innerHTML='';
   document.getElementById('tbodyInter').innerHTML='';
-  atualizarBadgeAusentes(); atualizarBadgeInter();
+
+  atualizarBadgeAusentes();
+  atualizarBadgeInter();
+  esconderErro();
 });
 
 document.getElementById('addAusente').addEventListener('click', ()=>{
-  document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente()); atualizarBadgeAusentes();
+  document.getElementById('tbodyAusentes').appendChild(novaLinhaAusente());
+  atualizarBadgeAusentes();
 });
+
 document.getElementById('tbodyAusentes').addEventListener('click', e=>{
-  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeAusentes(); }
+  if(e.target.closest('.del')){
+    e.target.closest('tr').remove();
+    atualizarBadgeAusentes();
+  }
 });
 document.getElementById('tbodyAusentes').addEventListener('input', atualizarBadgeAusentes);
 document.getElementById('tbodyAusentes').addEventListener('change', atualizarBadgeAusentes);
 
 document.getElementById('addInter').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
+  document.getElementById('tbodyInter').appendChild(novaLinhaInter());
+  atualizarBadgeInter();
 });
 document.getElementById('addInter2').addEventListener('click', ()=>{
-  document.getElementById('tbodyInter').appendChild(novaLinhaInter()); atualizarBadgeInter();
+  document.getElementById('tbodyInter').appendChild(novaLinhaInter());
+  atualizarBadgeInter();
 });
 document.getElementById('tbodyInter').addEventListener('click', e=>{
-  if(e.target.closest('.del')){ e.target.closest('tr').remove(); atualizarBadgeInter(); }
+  if(e.target.closest('.del')){
+    e.target.closest('tr').remove();
+    atualizarBadgeInter();
+  }
 });
 document.getElementById('tbodyInter').addEventListener('input', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
@@ -398,34 +517,52 @@ document.getElementById('tbodyInter').addEventListener('change', e=>{
   if(e.target.name==='inter_codigo'){ autoDescricaoPorCodigo(e.target); atualizarBadgeInter(); }
 });
 
-window.addEventListener('DOMContentLoaded', ()=>{
-  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
-  renderTotalGeral(); atualizarBadgeAusentes();
-  renderCatalogo(); atualizarBadgeInter();
+// Toggle catálogo
+document.getElementById('toggleCatalogo').addEventListener('click', ()=>{
+  const box = document.getElementById('catalogo');
+  box.style.display = (box.style.display === 'block') ? 'none' : 'block';
 });
+
+/* ======= INIT ======= */
+window.addEventListener('DOMContentLoaded', async ()=>{
+  await carregarUsuarioEPreencherResponsavel();
+  document.querySelectorAll('#tbody tr').forEach(atualizarLinha);
+  renderTotalGeral();
+  atualizarBadgeAusentes();
+  renderCatalogo();
+  atualizarBadgeInter();
+});
+
+/* ======= UI erro ======= */
+function mostrarErro(msg){
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function esconderErro(){
+  const box = document.getElementById('errorBox');
+  box.textContent = '';
+  box.style.display = 'none';
+}
 
 /* ======= INTEGRAÇÃO COM O BACKEND ======= */
 function coletarPayload(){
   const obra        = document.querySelector('[name="obra"]').value.trim();
   const responsavel = document.querySelector('[name="responsavel"]').value.trim();
-  const data        = document.querySelector('[name="data"]').value; // YYYY-MM-DD
+  const data        = document.querySelector('[name="data"]').value;
   const observacoes = document.querySelector('[name="observacoes"]').value.trim();
 
-  // IMPORTANTE: plural, para bater com o server.js
-  const funcoes=[]; 
-  document.querySelectorAll('#tbody tr').forEach(tr=>{
+  const funcoes=[]; document.querySelectorAll('#tbody tr').forEach(tr=>{
     funcoes.push({
       funcao: tr.querySelector('.fun').textContent.trim(),
-      presentes: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
-      ausentes:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
-      ferias:    parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
+      presente: parseInt(tr.querySelector('input[data-tipo="presente"]').value||'0',10),
+      ausente:  parseInt(tr.querySelector('input[data-tipo="ausente"]').value||'0',10),
+      ferias:   parseInt(tr.querySelector('input[data-tipo="ferias"]').value||'0',10)
     });
   });
 
-  // OBS: o server atual não persiste "ausentes" individualizados,
-  // mas podemos continuar enviando (o backend ignora com segurança).
-  const ausentes=[];
-  document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
+  const ausentes=[]; document.querySelectorAll('#tbodyAusentes tr').forEach(tr=>{
     ausentes.push({
       chapa: tr.querySelector('[name="aus_chapa"]').value.trim(),
       nome: tr.querySelector('[name="aus_nome"]').value.trim(),
@@ -433,8 +570,7 @@ function coletarPayload(){
     });
   });
 
-  const intercorrencias=[];
-  document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
+  const intercorrencias=[]; document.querySelectorAll('#tbodyInter tr').forEach(tr=>{
     intercorrencias.push({
       codigo: tr.querySelector('[name="inter_codigo"]').value.trim(),
       descricao: tr.querySelector('[name="inter_desc"]').value.trim()
@@ -446,22 +582,39 @@ function coletarPayload(){
 
 document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
+  esconderErro();
+
   const payload = coletarPayload();
 
   const erros = [];
-  if(!payload.obra)        erros.push('Informe a obra.');
-  if(!payload.responsavel) erros.push('Informe o responsável.');
-  if(!payload.data)        erros.push('Informe a data.');
+  if(!payload.obra)        erros.push('• Informe a obra.');
+  if(!payload.responsavel) erros.push('• Informe o responsável (preenchido automaticamente, mas pode editar).');
+  if(!payload.data)        erros.push('• Informe a data.');
 
+  // intercorrências: pelo menos 1 (código 0 quando não houver)
   const interValidas = payload.intercorrencias.filter(i => i.codigo || i.descricao);
   if(interValidas.length===0){
-    erros.push('Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto).');
-  }
-  if(erros.length){
-    alert(erros.join('\n'));
-    return;
+    erros.push('• Informe pelo menos uma intercorrência (use o código 0 quando não houver impacto).');
   }
   payload.intercorrencias = interValidas;
+
+  // ✅ Regra 2: se informou X ausentes por função, precisa ter X ausentes identificados completos
+  const ausentesInformados = totalAusentesInformados();
+  const ausentesIdentificadosCompletos = contarAusentesListadosValidos();
+
+  if(ausentesInformados > 0){
+    if(ausentesIdentificadosCompletos !== ausentesInformados){
+      erros.push(
+        `• Você informou ${ausentesInformados} AUSENTE(S) por função, mas identificou ${ausentesIdentificadosCompletos} na lista.\n`+
+        `  → A lista de ausentes deve ter a MESMA quantidade e cada linha precisa ter CHAPA + NOME + FUNÇÃO.`
+      );
+    }
+  }
+
+  if(erros.length){
+    mostrarErro('Não foi possível salvar:\n\n' + erros.join('\n'));
+    return;
+  }
 
   try{
     const resp = await fetch(`${API}/api/diarios`, {
@@ -470,16 +623,17 @@ document.getElementById('diarioForm').addEventListener('submit', async (e)=>{
       body:JSON.stringify(payload),
       credentials:'include'
     });
-
-    const json = await resp.json().catch(()=> ({}));
+    const json = await resp.json();
     if(!resp.ok){
-      alert('Erro: '+(json.error||'Falha ao salvar'));
+      mostrarErro('Erro ao salvar: ' + (json.error || 'Falha ao salvar'));
       return;
     }
     alert('Diário salvo com ID #'+json.id);
+    // opcional: ir pra index
+    // location.href = 'index.html';
   }catch(err){
     console.error(err);
-    alert('Não foi possível conectar ao servidor.');
+    mostrarErro('Não foi possível conectar ao servidor.');
   }
 });
 </script>
