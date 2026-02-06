@@ -17,9 +17,6 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-diario-obra';
 
-// Render/Proxy (importante para cookies em produção)
-app.set('trust proxy', 1);
-
 // Middlewares
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -32,36 +29,11 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 12, // 12h
+      // secure: true, // habilite se estiver 100% em https
     },
   })
 );
-
-// --------------------------------------------------
-// Gate: bloquear acesso direto a páginas protegidas
-// e redirecionar para login com ?next=...
-// --------------------------------------------------
-const PROTECTED_PAGES = new Set([
-  '/index.html',
-  '/form.html',
-  '/viewer.html',
-  '/details.html',
-  '/edit.html',
-  '/admin.html',
-]);
-
-app.use((req, res, next) => {
-  if (PROTECTED_PAGES.has(req.path)) {
-    if (!req.session.user) {
-      return res.redirect(`/login.html?next=${encodeURIComponent(req.path)}`);
-    }
-  }
-  next();
-});
-
-// Conteúdo estático (HTML/JS/CSS)
-app.use(express.static(path.join(__dirname)));
 
 // -------------------------
 // Banco de dados (SQLite)
@@ -106,11 +78,14 @@ CREATE TABLE IF NOT EXISTS intercorrencias (
   FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
 );
 
-/*
-  ✅ (Ainda não implementado aqui)
-  Ausentes individualizados vai entrar depois:
-  CREATE TABLE IF NOT EXISTS ausentes (...)
-*/
+CREATE TABLE IF NOT EXISTS ausentes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  diario_id INTEGER NOT NULL,
+  chapa TEXT,
+  nome TEXT,
+  funcao TEXT,
+  FOREIGN KEY (diario_id) REFERENCES diarios(id) ON DELETE CASCADE
+);
 `);
 
 // (Opcional) Índices para desempenho
@@ -119,6 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_diarios_data         ON diarios(data);
 CREATE INDEX IF NOT EXISTS idx_funcoes_diario       ON funcoes(diario_id);
 CREATE INDEX IF NOT EXISTS idx_intercorrencias_did  ON intercorrencias(diario_id);
 CREATE INDEX IF NOT EXISTS idx_intercorrencias_cod  ON intercorrencias(codigo);
+CREATE INDEX IF NOT EXISTS idx_ausentes_diario      ON ausentes(diario_id);
 `);
 
 // Seeds de usuários
@@ -134,9 +110,9 @@ function ensureUser(email, pass, role) {
 }
 ensureUser('admin@obra.local', 'admin123', 'admin');
 ensureUser('engenheiro@obra.local', '123456', 'engenheiro');
-
-// ✅ seed do APONTADOR (opcional, mas útil pra testar)
-ensureUser('apontador@obra.local', '123456', 'apontador');
+// exemplo (se quiser seed):
+// ensureUser('apontador@obra.local', '123456', 'apontador');
+// ensureUser('curadoria@obra.local', '123456', 'curadoria');
 
 // --------------------------------------------------
 // Carregamento do CSV de funcionários em memória
@@ -185,23 +161,53 @@ function requireLogin(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: 'Não autenticado' });
   next();
 }
-function requireAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Acesso restrito a administradores.' });
+
+function requireRole(roles = []) {
+  return (req, res, next) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Não autenticado' });
+    if (!roles.includes(req.session.user.role)) {
+      return res.status(403).json({ error: 'Sem permissão.' });
+    }
+    next();
+  };
+}
+
+const requireAdmin = requireRole(['admin']);
+
+// Permissões
+const CAN_CURATE = ['admin', 'engenheiro', 'curadoria']; // pode ver viewer/details/listas
+const CAN_LAUNCH = ['admin', 'engenheiro', 'curadoria', 'apontador']; // pode lançar diário (POST)
+
+// --------------------------------------------------
+// 🔒 Bloqueio de HTML sensível via express.static
+// (IMPORTANTE: impede apontador de abrir /viewer.html etc. direto)
+// --------------------------------------------------
+const PROTECTED_HTML = new Set([
+  '/viewer.html',
+  '/details.html',
+  '/edit.html',
+  '/admin.html',
+]);
+
+app.use((req, res, next) => {
+  const p = req.path;
+  if (!PROTECTED_HTML.has(p)) return next();
+
+  // não logado -> manda pro login (HTML)
+  if (!req.session.user) {
+    return res.redirect(`/login.html?next=${encodeURIComponent(p)}`);
   }
+
+  // apontador não acessa essas páginas
+  if (!CAN_CURATE.includes(req.session.user.role)) {
+    return res.redirect('/'); // manda pro hub
+  }
+
   next();
-}
-function requireCuradoria(req, res, next) {
-  const u = req.session.user;
-  if (!u) return res.redirect('/login.html?next=/viewer');
-  const can = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
-  if (!can) return res.status(403).send('Sem permissão para Curadoria.');
-  next();
-}
-function canLancar(req) {
-  const u = req.session.user;
-  return !!u && (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria' || u.role === 'apontador');
-}
+});
+
+// Conteúdo estático (HTML/JS/CSS)
+app.use(express.static(path.join(__dirname)));
 
 // --------------------------------------------------
 // Rotas de sessão / usuários
@@ -257,11 +263,38 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
       const hash = bcrypt.hashSync(senha, 10);
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
     }
-    if (role) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
-    if (typeof active !== 'undefined') db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
+    if (role) {
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+    }
+    if (typeof active !== 'undefined') {
+      db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: 'Falha ao atualizar usuário.' });
+  }
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    if (req.session.user && Number(req.session.user.id) === id) {
+      return res.status(400).json({ error: 'Você não pode excluir seu próprio usuário.' });
+    }
+
+    // não deixar excluir o último admin ativo
+    const admins = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1").get();
+    const target = db.prepare("SELECT id, role, active FROM users WHERE id=?").get(id);
+    if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+    if (target.role === 'admin' && target.active === 1 && (admins?.n || 0) <= 1) {
+      return res.status(400).json({ error: 'Não é possível excluir o último admin ativo.' });
+    }
+
+    db.prepare('DELETE FROM users WHERE id=?').run(id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao excluir usuário.' });
   }
 });
 
@@ -286,19 +319,18 @@ app.get('/api/funcionarios', requireLogin, (req, res) => {
 // --------------------------------------------------
 // Diários – criação e leitura
 // --------------------------------------------------
-app.post('/api/diarios', requireLogin, (req, res) => {
-  try {
-    if (!canLancar(req)) {
-      return res.status(403).json({ error: 'Seu perfil não tem permissão para lançar diário.' });
-    }
 
+// ✅ Apontador pode salvar diário
+app.post('/api/diarios', requireRole(CAN_LAUNCH), (req, res) => {
+  try {
     const {
-      data,          // 'YYYY-MM-DD'
+      data,
       obra,
       responsavel,
       observacoes,
-      funcoes = [],          // [{funcao, presentes, ausentes, ferias}]
+      funcoes = [],          // [{funcao, presente/ausente/ferias} ou presentes/ausentes/ferias]
       intercorrencias = [],  // [{codigo, descricao}]
+      ausentes = [],         // [{chapa,nome,funcao}]
     } = req.body || {};
 
     if (!data || !obra || !responsavel) {
@@ -318,9 +350,9 @@ app.post('/api/diarios', requireLogin, (req, res) => {
       insF.run(
         diarioId,
         (f.funcao || '').trim(),
-        Number(f.presentes || 0),
-        Number(f.ausentes || 0),
-        Number(f.ferias || 0)
+        Number(f.presentes ?? f.presente ?? 0),
+        Number(f.ausentes  ?? f.ausente  ?? 0),
+        Number(f.ferias    ?? f.ferias   ?? 0)
       );
     }
 
@@ -332,6 +364,18 @@ app.post('/api/diarios', requireLogin, (req, res) => {
       insI.run(diarioId, String(i.codigo).trim(), (i.descricao || '').trim());
     }
 
+    const insA = db.prepare(
+      `INSERT INTO ausentes(diario_id,chapa,nome,funcao) VALUES (?,?,?,?)`
+    );
+    for (const a of ausentes) {
+      if (!a) continue;
+      const chapa = (a.chapa || '').trim();
+      const nome  = (a.nome  || '').trim();
+      const func  = (a.funcao|| '').trim();
+      if (!chapa && !nome && !func) continue;
+      insA.run(diarioId, chapa || null, nome || null, func || null);
+    }
+
     res.json({ ok: true, id: diarioId });
   } catch (e) {
     console.error('POST /api/diarios erro:', e);
@@ -339,14 +383,9 @@ app.post('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
-// LISTA DIÁRIOS (Curadoria)
-app.get('/api/diarios', requireLogin, (req, res) => {
+// ✅ Somente curadoria/engenheiro/admin pode listar diários
+app.get('/api/diarios', requireRole(CAN_CURATE), (req, res) => {
   try {
-    // ✅ Apontador NÃO lista diários (curadoria)
-    const u = req.session.user;
-    const canList = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
-    if (!canList) return res.status(403).json({ error: 'Sem permissão para Curadoria.' });
-
     const obra = (req.query.obra || '').trim();
     const responsavel = (req.query.responsavel || '').trim();
 
@@ -432,13 +471,9 @@ app.get('/api/diarios', requireLogin, (req, res) => {
   }
 });
 
-// Detalhe de um diário (Curadoria)
-app.get('/api/diarios/:id', requireLogin, (req, res) => {
+// ✅ Somente curadoria/engenheiro/admin pode ver detalhe
+app.get('/api/diarios/:id', requireRole(CAN_CURATE), (req, res) => {
   try {
-    const u = req.session.user;
-    const canView = (u.role === 'admin' || u.role === 'engenheiro' || u.role === 'curadoria');
-    if (!canView) return res.status(403).json({ error: 'Sem permissão para Curadoria.' });
-
     const id = Number(req.params.id);
     const d = db.prepare('SELECT * FROM diarios WHERE id = ?').get(id);
     if (!d) return res.status(404).json({ error: 'Diário não encontrado.' });
@@ -451,8 +486,11 @@ app.get('/api/diarios/:id', requireLogin, (req, res) => {
       'SELECT codigo,descricao FROM intercorrencias WHERE diario_id = ? ORDER BY id'
     ).all(id);
 
-    // ⚠️ ausentes individualizados ainda não existe aqui — entra na próxima etapa
-    res.json({ ...d, funcoes: fun, intercorrencias: inc, ausentes: [] });
+    const aus = db.prepare(
+      'SELECT chapa,nome,funcao FROM ausentes WHERE diario_id = ? ORDER BY id'
+    ).all(id);
+
+    res.json({ ...d, funcoes: fun, intercorrencias: inc, ausentes: aus });
   } catch (e) {
     console.error('GET /api/diarios/:id erro:', e);
     res.status(500).json({ error: 'Falha ao buscar diário.' });
@@ -460,27 +498,29 @@ app.get('/api/diarios/:id', requireLogin, (req, res) => {
 });
 
 // -----------------------------------------------
-// Rotas HTML amigáveis (não usar /form.html direto)
+// Rotas HTML protegidas (roteamento simples)
 // -----------------------------------------------
-app.get('/', (req, res) => {
-  if (!req.session.user) return res.redirect('/login.html?next=/');
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 
-app.get('/login', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'login.html'));
-});
-
-app.get('/form', (req, res) => {
-  if (!req.session.user) return res.redirect('/login.html?next=/form');
+// form: apontador pode
+app.get('/form', requireRole(CAN_LAUNCH), (_req, res) => {
   res.sendFile(path.join(__dirname, 'form.html'));
 });
 
-app.get('/viewer', requireCuradoria, (_req, res) => {
+// viewer/details/edit: só curadoria+
+app.get('/viewer', requireRole(CAN_CURATE), (_req, res) => {
   res.sendFile(path.join(__dirname, 'viewer.html'));
 });
+app.get('/details', requireRole(CAN_CURATE), (_req, res) => {
+  res.sendFile(path.join(__dirname, 'details.html'));
+});
+app.get('/edit', requireRole(CAN_CURATE), (_req, res) => {
+  res.sendFile(path.join(__dirname, 'edit.html'));
+});
 
-app.get('/admin.html', requireLogin, requireAdmin, (_req, res) => {
+// admin: só admin
+app.get('/admin.html', requireAdmin, (_req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
