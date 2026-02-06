@@ -1,157 +1,174 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Login - Diário de Obra</title>
-<style>
-  :root { --prim:#3A6385; --muted:#66758a; --bg:#f4f6f9; }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0;
-    font-family: Arial, sans-serif;
-    background: var(--bg);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    min-height:100vh;
-    color:#233;
-  }
-  .card{
-    background:#fff;
-    padding:24px 24px 20px;
-    border-radius:12px;
-    box-shadow:0 10px 30px rgba(0,0,0,.12);
-    width:100%;
-    max-width:360px;
-  }
-  h1{
-    margin:0 0 4px;
-    font-size:22px;
-    text-align:center;
-    color:#333;
-  }
-  .subtitle{
-    margin:0 0 20px;
-    text-align:center;
-    font-size:13px;
-    color:var(--muted);
-  }
-  label{
-    display:block;
-    font-size:13px;
-    margin-bottom:4px;
-    color:#444;
-  }
-  input[type="text"],
-  input[type="password"]{
-    width:100%;
-    padding:8px 10px;
-    border-radius:6px;
-    border:1px solid #cfd6df;
-    font-size:14px;
-    outline:none;
-  }
-  input:focus{
-    border-color:var(--prim);
-    box-shadow:0 0 0 3px rgba(58,99,133,.12);
-  }
-  .field{ margin-bottom:14px; }
-  .btn{
-    width:100%;
-    padding:10px 14px;
-    border:none;
-    border-radius:8px;
-    background:var(--prim);
-    color:#fff;
-    font-size:15px;
-    cursor:pointer;
-  }
-  .btn:hover{ filter:brightness(.95); }
-  .msg{
-    margin-top:10px;
-    font-size:13px;
-    text-align:center;
-    min-height:18px;
-  }
-  .msg.err{ color:#c0392b; }
-  .msg.ok{ color:#1b8a5a; }
-  .footer{
-    margin-top:16px;
-    text-align:center;
-    font-size:12px;
-    color:var(--muted);
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login • Diário de Obra</title>
+  <style>
+    :root{
+      --bg:#f4f6fb; --card:#ffffff; --prim:#3A6385; --prim-dark:#284666;
+      --muted:#7b8794; --border:#e2e8f0; --danger:#e53e3e;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:#102a43;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:18px;
+    }
+    .wrap{width:100%; max-width:420px}
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:16px;
+      box-shadow:0 10px 26px rgba(15,23,42,.08); padding:18px 18px 16px;
+    }
+    h1{margin:0 0 6px; font-size:20px}
+    p{margin:0 0 14px; color:var(--muted); font-size:13px; line-height:1.35}
+    label{display:block; font-size:12px; color:var(--muted); margin:10px 0 6px}
+    input{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+      font-size:14px; outline:none; background:#fff;
+    }
+    input:focus{border-color:var(--prim); box-shadow:0 0 0 3px rgba(58,99,133,.12)}
+    .row{display:flex; gap:10px; margin-top:14px; align-items:center}
+    button{
+      width:100%; padding:10px 14px; border-radius:12px; border:none; cursor:pointer;
+      background:var(--prim); color:#fff; font-weight:700; font-size:14px;
+    }
+    button:hover{background:var(--prim-dark)}
+    .hint{
+      margin-top:12px; font-size:12px; color:var(--muted); text-align:center;
+    }
+    .error{
+      display:none; margin-top:12px; padding:10px 12px; border-radius:12px;
+      background:#fff5f5; border:1px solid #fed7d7; color:var(--danger); font-size:13px;
+    }
+    .small{
+      margin-top:10px; font-size:12px; color:var(--muted); text-align:center;
+    }
+    .tag{
+      display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid var(--border);
+      background:#f8fafc; color:#233; font-size:12px; margin-top:8px;
+    }
+  </style>
 </head>
 <body>
-<div class="card">
-  <h1>Diário de Obra</h1>
-  <p class="subtitle">Acesse para visualizar os diários lançados</p>
+  <div class="wrap">
+    <div class="card">
+      <h1>Entrar</h1>
+      <p>Faça login para acessar o sistema do <strong>Diário de Obra</strong>.</p>
 
-  <form id="loginForm" autocomplete="off">
-    <div class="field">
-      <label for="usuario">Usuário</label>
-      <input type="text" id="usuario" name="usuario" placeholder="Digite o usuário">
+      <form id="loginForm" autocomplete="off">
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" placeholder="ex: apontador@obra.local" required />
+
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" placeholder="••••••••" required />
+
+        <div class="row">
+          <button id="btnEntrar" type="submit">Entrar</button>
+        </div>
+
+        <div id="errorBox" class="error"></div>
+
+        <div class="hint">
+          <span class="tag">Dica: após logar, você será levado para a página inicial.</span>
+        </div>
+        <div class="small">
+          (Se você tentou abrir uma página específica, voltaremos automaticamente para ela.)
+        </div>
+      </form>
     </div>
-    <div class="field">
-      <label for="senha">Senha</label>
-      <input type="password" id="senha" name="senha" placeholder="Digite a senha">
-    </div>
-    <button type="submit" class="btn">Entrar</button>
-  </form>
-
-  <div id="msg" class="msg"></div>
-
-  <div class="footer">
-    Após logar, você será redirecionado para a tela de consulta (viewer).
   </div>
-</div>
 
 <script>
-  // mesma origem do backend (Render ou local)
-  const API = '';
-
   const form = document.getElementById('loginForm');
-  const msg  = document.getElementById('msg');
+  const errorBox = document.getElementById('errorBox');
+  const btn = document.getElementById('btnEntrar');
 
-  form.addEventListener('submit', async (e)=>{
+  function showError(msg){
+    errorBox.textContent = msg || 'Falha no login.';
+    errorBox.style.display = 'block';
+  }
+  function hideError(){
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+  }
+
+  function isCuradoriaPath(p){
+    if(!p) return false;
+    // protege tudo que é curadoria/revisão
+    return (
+      p.startsWith('/viewer') ||
+      p.startsWith('/details') ||
+      p.startsWith('/edit') ||
+      p.startsWith('/admin') ||
+      p.startsWith('/api/diarios') // em geral apontador não deveria navegar nisso
+    );
+  }
+
+  async function getMe(){
+    try{
+      const r = await fetch('/api/me', { credentials:'include' });
+      const j = await r.json();
+      return j.user || null;
+    } catch {
+      return null;
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    hideError();
 
-    msg.textContent = 'Autenticando...';
-    msg.className = 'msg';
+    const email = (document.getElementById('email').value || '').trim();
+    const senha = (document.getElementById('senha').value || '').trim();
+    if(!email || !senha){
+      showError('Informe e-mail e senha.');
+      return;
+    }
 
-    const usuario = document.getElementById('usuario').value;
-    const senha   = document.getElementById('senha').value;
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
 
     try{
-      const resp = await fetch(`${API}/api/login`, {
+      const r = await fetch('/api/login', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
-        // BACKEND ESPERA "email" E "senha"
-        body: JSON.stringify({ email: usuario, senha })
+        headers:{ 'Content-Type':'application/json' },
+        credentials:'include',
+        body: JSON.stringify({ email, senha })
       });
 
-      const data = await resp.json().catch(()=> ({}));
-
-      if(!resp.ok){
-        msg.textContent = data.error || 'Usuário ou senha inválidos.';
-        msg.classList.add('err');
+      const j = await r.json().catch(()=> ({}));
+      if(!r.ok){
+        showError(j.error || 'Usuário ou senha inválidos.');
         return;
       }
 
-      msg.textContent = 'Login realizado com sucesso. Redirecionando...';
-      msg.classList.add('ok');
+      // ✅ Redirect pós-login:
+      // - Se tiver next, respeita
+      // - Se for apontador e next for curadoria, força "/"
+      // - Default sempre "/"
+      const params = new URLSearchParams(location.search);
+      let next = params.get('next') || '/';
 
-      setTimeout(()=>{
-        window.location.href = 'viewer.html';
-      }, 600);
+      const user = await getMe();
+      if(user && user.role === 'apontador' && isCuradoriaPath(next)){
+        next = '/';
+      }
 
-    }catch(err){
+      location.href = next;
+
+    } catch(err){
       console.error(err);
-      msg.textContent = 'Não foi possível conectar ao servidor.';
-      msg.classList.add('err');
+      showError('Não foi possível conectar ao servidor.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
     }
+  });
+
+  // opcional: se já estiver logado, manda pra home
+  window.addEventListener('DOMContentLoaded', async ()=>{
+    const user = await getMe();
+    if(user) location.href = '/';
   });
 </script>
 </body>
